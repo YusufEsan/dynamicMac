@@ -33,11 +33,17 @@ public final class IslandHostingView<Content: View>: NSHostingView<Content> {
         let isExp: Bool
         if case .expanded = provider.expansionState { isExp = true } else { isExp = false }
         
-        let width: CGFloat = isExp ? 780 : 420
-        let height: CGFloat = isExp ? 290 : 65
+        let width: CGFloat = isExp ? 780 : 380
+        let height: CGFloat = isExp ? 270 : 44
+        let yOffset: CGFloat = isTopAttached ? 0 : 2
         
-        // In NSHostingView coordinate system, y = 0 is at the top edge of the window!
-        let islandRect = CGRect(x: (bounds.width - width) / 2.0, y: 0, width: width, height: height)
+        // In IslandHostingView coordinates: y=0 is at the top edge of the island, and height=44 covers the compact capsule
+        let islandRect = CGRect(
+            x: (bounds.width - width) / 2.0,
+            y: yOffset,
+            width: width,
+            height: height
+        )
         let isInside = islandRect.contains(localPoint)
         
         print("🎯 [HitTest] localPoint: \(localPoint), islandRect: \(islandRect), inside: \(isInside), isExp: \(isExp)")
@@ -55,24 +61,6 @@ public final class IslandHostingView<Content: View>: NSHostingView<Content> {
     }
     
     public override func mouseDown(with event: NSEvent) {
-        let localPoint = self.convert(event.locationInWindow, from: nil)
-        print("🖱️ [MouseDown] localPoint: \(localPoint), windowLoc: \(event.locationInWindow)")
-        fflush(stdout)
-        
-        let provider = IslandContentProvider.shared
-        let isExp: Bool
-        if case .expanded = provider.expansionState { isExp = true } else { isExp = false }
-        
-        if !isExp {
-            print("⚡ [MouseDown Action] Triggering expand to music!")
-            fflush(stdout)
-            DispatchQueue.main.async {
-                withAnimation(AnimationConstants.islandMorphSpring) {
-                    provider.expansionState = .expanded(.music)
-                }
-            }
-            return
-        }
         super.mouseDown(with: event)
     }
 }

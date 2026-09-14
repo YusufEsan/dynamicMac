@@ -21,7 +21,7 @@ public final class WindowSwitcherController {
     @MainActor
     private func setupPanel() {
         let panel = NSPanel(
-            contentRect: NSRect(x: 0, y: 0, width: 920, height: 420),
+            contentRect: NSRect(x: 0, y: 0, width: 760, height: 220),
             styleMask: [.borderless, .nonactivatingPanel],
             backing: .buffered,
             defer: false
@@ -37,8 +37,54 @@ public final class WindowSwitcherController {
         hostingView.wantsLayer = true
         hostingView.layer?.backgroundColor = NSColor.clear.cgColor
         panel.contentView = hostingView
-        panel.center()
         self.window = panel
+    }
+    
+    @MainActor
+    private func updateFrameAndCenter() {
+        guard let panel = self.window else { return }
+        
+        let count = WindowManager.shared.windows.count
+        let colsCount: CGFloat
+        if count <= 0 {
+            colsCount = 1
+        } else if count <= 4 {
+            colsCount = CGFloat(count)
+        } else if count <= 8 {
+            colsCount = 4
+        } else {
+            colsCount = 5
+        }
+        
+        let rowsCount: CGFloat = count <= 0 ? 1 : ceil(CGFloat(count) / colsCount)
+        
+        let cardWidth: CGFloat = 172
+        let cardHeight: CGFloat = 166
+        let gridSpacing: CGFloat = 12
+        let outerPadding: CGFloat = 14 * 2
+        let headerHeight: CGFloat = 22
+        
+        let contentWidth: CGFloat
+        let contentHeight: CGFloat
+        
+        if count == 0 {
+            contentWidth = 308
+            contentHeight = 158
+        } else {
+            contentWidth = (colsCount * cardWidth) + ((colsCount - 1) * gridSpacing) + outerPadding
+            contentHeight = outerPadding + headerHeight + gridSpacing + (rowsCount * cardHeight) + ((rowsCount - 1) * gridSpacing)
+        }
+        
+        let mouseLoc = NSEvent.mouseLocation
+        let targetScreen = NSScreen.screens.first(where: { NSMouseInRect(mouseLoc, $0.frame, false) })
+            ?? NSScreen.main
+            ?? NSScreen.screens.first
+            
+        let screenFrame = targetScreen?.visibleFrame ?? NSRect(x: 0, y: 0, width: 1440, height: 900)
+        let x = screenFrame.midX - (contentWidth / 2)
+        let y = screenFrame.midY - (contentHeight / 2)
+        
+        panel.setFrame(NSRect(x: x, y: y, width: contentWidth, height: contentHeight), display: true, animate: false)
     }
     
     public func setupEventTap() {
@@ -125,7 +171,7 @@ public final class WindowSwitcherController {
         DispatchQueue.main.async {
             if self.window == nil { self.setupPanel() }
             WindowManager.shared.refreshWindows()
-            self.window?.center()
+            self.updateFrameAndCenter()
             self.window?.orderFrontRegardless()
             self.isVisible = true
         }

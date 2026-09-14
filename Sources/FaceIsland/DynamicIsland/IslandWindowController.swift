@@ -32,8 +32,9 @@ public final class IslandWindowController {
     
     @discardableResult
     public static func handleScreenClick() -> Bool {
+        guard let window = IslandWindowController.shared.window, window.isVisible, !SettingsManager.shared.forceFloatingCapsule else { return false }
         let mouseLoc = NSEvent.mouseLocation
-        guard let screen = NSScreen.main ?? NSScreen.screens.first else { return false }
+        guard let screen = window.screen ?? NSScreen.main ?? NSScreen.screens.first else { return false }
         let screenFrame = screen.frame
         
         let provider = IslandContentProvider.shared
@@ -50,24 +51,6 @@ public final class IslandWindowController {
                 DispatchQueue.main.async {
                     withAnimation(AnimationConstants.islandMorphSpring) {
                         provider.collapse()
-                    }
-                }
-                return true
-            }
-        } else if case .compact = provider.expansionState {
-            let notchWidth: CGFloat = 400
-            let notchHeight: CGFloat = 70
-            let notchRect = CGRect(
-                x: screenFrame.midX - (notchWidth / 2.0),
-                y: screenFrame.maxY - notchHeight,
-                width: notchWidth,
-                height: notchHeight
-            )
-            let inside = notchRect.contains(mouseLoc)
-            if inside {
-                DispatchQueue.main.async {
-                    withAnimation(AnimationConstants.islandMorphSpring) {
-                        provider.expansionState = .expanded(.music)
                     }
                 }
                 return true

@@ -5,20 +5,20 @@ public struct WindowSwitcherView: View {
     
     public init() {}
     
-    private var gridColumns: [GridItem] {
+    private var colsCount: Int {
         let count = max(1, windowManager.windows.count)
-        let cols = count <= 3 ? count : (count <= 8 ? 4 : 5)
-        return Array(repeating: GridItem(.flexible(minimum: 140, maximum: 200), spacing: 14), count: cols)
+        if count <= 4 { return count }
+        if count <= 8 { return 4 }
+        return 5
+    }
+    
+    private var gridColumns: [GridItem] {
+        return Array(repeating: GridItem(.fixed(172), spacing: 12), count: colsCount)
     }
     
     public var body: some View {
-        ZStack {
-            // Unified Dark Card-Themed Background
-            RoundedRectangle(cornerRadius: 22, style: .continuous)
-                .fill(Color(red: 0.12, green: 0.12, blue: 0.14))
-                .shadow(color: .black.opacity(0.50), radius: 24, x: 0, y: 12)
-            
-            VStack(spacing: 14) {
+        ZStack(alignment: .center) {
+            VStack(spacing: 12) {
                 headerView
                 
                 if windowManager.windows.isEmpty {
@@ -27,46 +27,54 @@ public struct WindowSwitcherView: View {
                     gridView
                 }
             }
-            .padding(16)
+            .padding(14)
+            .background(
+                RoundedRectangle(cornerRadius: 22, style: .continuous)
+                    .fill(Color(red: 0.12, green: 0.12, blue: 0.14))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 22, style: .continuous)
+                            .stroke(Color.white.opacity(0.12), lineWidth: 1)
+                    )
+            )
         }
-        .frame(minWidth: 620, maxWidth: 960)
-        .padding(10)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
+        .animation(.spring(response: 0.30, dampingFraction: 0.8), value: windowManager.windows.count)
     }
     
     private var headerView: some View {
         HStack {
             Image(systemName: "macwindow.on.rectangle")
-                .font(.system(size: 14, weight: .bold))
+                .font(.system(size: 13.5, weight: .bold))
                 .foregroundColor(Color(red: 0.11, green: 0.84, blue: 0.38))
             
             Text("Pencere Değiştirici (Alt + Tab)")
-                .font(.system(size: 13.5, weight: .bold, design: .rounded))
+                .font(.system(size: 13, weight: .bold, design: .rounded))
                 .foregroundColor(.white)
             
-            Spacer()
+            Spacer(minLength: 16)
             
             Text("\(windowManager.windows.count) açık pencere")
-                .font(.system(size: 11.5, weight: .medium, design: .rounded))
+                .font(.system(size: 11, weight: .medium, design: .rounded))
                 .foregroundColor(.white.opacity(0.65))
         }
-        .padding(.horizontal, 6)
+        .padding(.horizontal, 4)
         .padding(.top, 2)
     }
     
     private var emptyStateView: some View {
         VStack(spacing: 8) {
             Image(systemName: "macwindow.badge.plus")
-                .font(.system(size: 32))
+                .font(.system(size: 30))
                 .foregroundColor(.white.opacity(0.3))
             Text("Açık uygulama penceresi bulunamadı")
-                .font(.system(size: 13))
+                .font(.system(size: 12.5))
                 .foregroundColor(.white.opacity(0.6))
         }
-        .frame(maxWidth: .infinity, minHeight: 160)
+        .frame(width: 280, height: 130)
     }
     
     private var gridView: some View {
-        LazyVGrid(columns: gridColumns, spacing: 14) {
+        LazyVGrid(columns: gridColumns, spacing: 12) {
             ForEach(Array(windowManager.windows.enumerated()), id: \.element.id) { index, win in
                 WindowSwitcherCard(
                     window: win,
@@ -83,8 +91,6 @@ public struct WindowSwitcherView: View {
                 )
             }
         }
-        .padding(.horizontal, 2)
-        .padding(.bottom, 4)
     }
 }
 
@@ -103,14 +109,15 @@ private struct WindowSwitcherCard: View {
                 thumbnailArea
                 labelArea
             }
-            .padding(8)
-            .background(isSelected ? Color(red: 0.20, green: 0.20, blue: 0.23) : Color(red: 0.16, green: 0.16, blue: 0.18))
+            .padding(7)
+            .frame(width: 172)
+            .background(isSelected ? Color(red: 0.20, green: 0.20, blue: 0.23) : Color(red: 0.15, green: 0.15, blue: 0.17))
             .cornerRadius(14)
             .overlay(
                 RoundedRectangle(cornerRadius: 14)
                     .stroke(isSelected ? emeraldColor : Color.white.opacity(0.06), lineWidth: isSelected ? 2 : 1)
             )
-            .shadow(color: isSelected ? emeraldColor.opacity(0.35) : Color.black.opacity(0.40), radius: isSelected ? 10 : 3, y: 2)
+            .shadow(color: isSelected ? emeraldColor.opacity(0.35) : Color.black.opacity(0.35), radius: isSelected ? 10 : 2, y: 2)
             .scaleEffect(isSelected ? 1.02 : 1.0)
         }
         .buttonStyle(.plain)
@@ -147,7 +154,7 @@ private struct WindowSwitcherCard: View {
                 appIconOverlay(icon: icon)
             }
         }
-        .frame(height: 110)
+        .frame(height: 108)
     }
     
     private var currentBadge: some View {

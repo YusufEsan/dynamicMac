@@ -19,14 +19,19 @@ public final class NowPlayingManager {
     
     public var currentPosition: Double {
         get {
-            if isPlaying && playbackRate > 0 && duration > 0 {
+            if isPlaying {
                 let elapsedSinceUpdate = Date().timeIntervalSince(lastTimestamp)
-                return min(duration, max(0.0, basePosition + (elapsedSinceUpdate * playbackRate)))
+                let rate = playbackRate > 0 ? playbackRate : 1.0
+                let pos = basePosition + (elapsedSinceUpdate * rate)
+                if duration > 0 {
+                    return min(duration, max(0.0, pos))
+                }
+                return max(0.0, pos)
             }
             return basePosition
         }
         set {
-            basePosition = max(0.0, min(duration > 0 ? duration : 3600.0, newValue))
+            basePosition = max(0.0, min(duration > 0 ? duration : 7200.0, newValue))
             lastTimestamp = Date()
         }
     }
@@ -81,6 +86,8 @@ public final class NowPlayingManager {
     private var isFetching = false
     private var lastArtworkQuery: String = ""
     private var artworkCache: [String: NSImage] = [:]
+    private var lastActiveUrl: String = ""
+    private var youtubeDurationCache: [String: Double] = [:]
     
     private init() {
         setupMediaRemote()
@@ -179,22 +186,25 @@ public final class NowPlayingManager {
                     } else if self.isAppRunning("com.apple.Music") {
                         detectedApp = "Music"
                     } else if self.isAppRunning("com.google.Chrome") {
-                        detectedApp = "YouTube"
+                        detectedApp = "Chrome"
                     }
                     
                     DispatchQueue.main.async {
                         self.isPlaying = isMediaPlaying
                         self.title = trackTitle
-                        self.artist = trackArtist.isEmpty ? (detectedApp == "YouTube" ? "YouTube Video" : "") : trackArtist
-                        self.album = trackAlbum
+                        self.artist = trackArtist.isEmpty ? (detectedApp == "Chrome" ? "Film / Dizi (Chrome)" : (detectedApp == "YouTube" ? "YouTube Video" : "")) : trackArtist
+                        self.album = trackAlbum.isEmpty && detectedApp == "Chrome" ? "Web Medya" : trackAlbum
                         self.duration = trackDuration
                         self.basePosition = trackElapsed
                         self.lastTimestamp = infoTimestamp
-                        self.playbackRate = rate
+                        self.playbackRate = isMediaPlaying ? (rate > 0 ? rate : 1.0) : 0.0
                         self.activePlayerName = detectedApp
                         
                         if let img = newImage {
                             self.artwork = img
+                        } else if detectedApp == "Chrome" {
+                            // Fetch Chrome tab URL / Favicon / JS stats
+                            self.fetchChromeMediaState(mediaRemotePlaying: isMediaPlaying)
                         } else if self.artwork == nil {
                             self.fetchArtworkIfNeeded(title: trackTitle, artist: trackArtist)
                         }
@@ -222,7 +232,7 @@ public final class NowPlayingManager {
         }
         // 3. Google Chrome
         else if isAppRunning("com.google.Chrome") {
-            fetchChromeMediaState()
+            fetchChromeMediaState(mediaRemotePlaying: false)
         } else {
             DispatchQueue.main.async { [weak self] in
                 if self?.isPlaying == true {
@@ -230,6 +240,9 @@ public final class NowPlayingManager {
                     self?.title = "Müzik Çalmıyor"
                     self?.artist = ""
                     self?.artwork = nil
+                    self?.duration = 0
+                    self?.basePosition = 0
+                    self?.playbackRate = 0
                     self?.dominantColor = Color.pink
                 }
             }
@@ -240,64 +253,228 @@ public final class NowPlayingManager {
         return !NSRunningApplication.runningApplications(withBundleIdentifier: bundleId).isEmpty
     }
     
-    private func fetchChromeMediaState() {
+    private func fetchChromeMediaState(mediaRemotePlaying: Bool = true) {
+        let jsCode = "(() => { function parseT(t) { if (!t) return 0; let p = t.trim().split(':'); if (p.length === 3) return (+p[0])*3600 + (+p[1])*60 + (+p[2]); if (p.length === 2) return (+p[0])*60 + (+p[1]); return +t || 0; } let videos = Array.from(document.querySelectorAll('video, audio')); document.querySelectorAll('iframe').forEach(f => { try { if (f.contentDocument) { videos = videos.concat(Array.from(f.contentDocument.querySelectorAll('video, audio'))); } } catch(e) {} }); for (let v of videos) { if (!v.paused && v.duration && v.duration > 0 && !isNaN(v.duration)) { return Math.floor(v.currentTime) + '|||' + Math.floor(v.duration) + '|||1'; } } for (let v of videos) { if (v.paused && v.duration && v.duration > 0) { return Math.floor(v.currentTime) + '|||' + Math.floor(v.duration) + '|||0'; } } return ''; })()"
+        
         let script = """
         tell application "Google Chrome"
             if it is running then
-                set winList to windows
-                repeat with w in winList
-                    set tabList to tabs of w
-                    repeat with t in tabList
-                        set tTitle to title of t
-                        set tUrl to URL of t
-                        if tTitle contains "YouTube" or tUrl contains "youtube.com" then
-                            return "playing|||" & tTitle & "|||" & tUrl
+                -- 1. Check active tab of front window
+                try
+                    set frontWin to front window
+                    set curTab to active tab of frontWin
+                    set curTitle to title of curTab
+                    set curUrl to URL of curTab
+                    if curTitle is not "" and curTitle is not "New Tab" and curTitle is not "Yeni Sekme" and curTitle is not "Settings" then
+                        set vStats to ""
+                        try
+                            set vStats to execute curTab javascript "\(jsCode)"
+                        end try
+                        if vStats is not "" then
+                            return "stats|||" & curTitle & "|||" & curUrl & "|||" & vStats
                         end if
-                    end repeat
-                end repeat
+                        return "info|||" & curTitle & "|||" & curUrl
+                    end if
+                end try
             end if
             return "stopped"
         end tell
         """
         executeAppleScript(script) { [weak self] result in
             guard let self = self, let result = result else { return }
-            self.handleBrowserResult(result: result, browserName: "Chrome")
+            self.handleBrowserResult(result: result, browserName: "Chrome", mediaRemotePlaying: mediaRemotePlaying)
         }
     }
     
-    private func handleBrowserResult(result: String, browserName: String) {
+    private func handleBrowserResult(result: String, browserName: String, mediaRemotePlaying: Bool) {
         let parts = result.components(separatedBy: "|||")
         DispatchQueue.main.async { [weak self] in
             guard let self = self else { return }
-            if parts.count >= 3 && parts[0] == "playing" {
+            let status = parts.first ?? "stopped"
+            
+            if status == "stats" && parts.count >= 6 {
                 var cleanTitle = parts[1]
+                    .replacingOccurrences(of: " - Google Chrome", with: "")
                     .replacingOccurrences(of: " - YouTube", with: "")
                     .replacingOccurrences(of: "YouTube - ", with: "")
                     .trimmingCharacters(in: .whitespacesAndNewlines)
+                
+                if let pipeIdx = cleanTitle.lastIndex(of: "|") {
+                    cleanTitle = String(cleanTitle[..<pipeIdx]).trimmingCharacters(in: .whitespacesAndNewlines)
+                }
                 if cleanTitle.hasPrefix("(") && cleanTitle.contains(") ") {
                     if let endIdx = cleanTitle.firstIndex(of: ")") {
                         cleanTitle = String(cleanTitle[cleanTitle.index(after: endIdx)...]).trimmingCharacters(in: .whitespacesAndNewlines)
                     }
                 }
                 
-                self.isPlaying = true
-                self.title = cleanTitle.isEmpty ? "YouTube Video" : cleanTitle
-                self.artist = "YouTube (\(browserName))"
+                let urlString = parts[2]
+                let isYT = urlString.contains("youtube.com") || parts[1].contains("YouTube")
+                let rawCurr = parts[3].trimmingCharacters(in: .whitespacesAndNewlines)
+                let rawDur = parts[4].trimmingCharacters(in: .whitespacesAndNewlines)
+                let isPlayingFlag = parts[5].trimmingCharacters(in: .whitespacesAndNewlines)
+                
+                let parsedCurrent = Self.parseTimeString(rawCurr)
+                let parsedDuration = Self.parseTimeString(rawDur)
+                let isVideoPlaying = (isPlayingFlag == "1")
+                
+                self.isPlaying = isVideoPlaying
+                self.title = cleanTitle.isEmpty ? (isYT ? "YouTube Video" : "Web Video / Film") : cleanTitle
+                self.artist = isYT ? "YouTube (\(browserName))" : "Film / Dizi (\(browserName))"
                 self.album = "Web Medya"
-                self.activePlayerName = "YouTube"
-                if self.duration == 0 { self.duration = 180 }
-                if self.basePosition == 0 { self.basePosition = 45 }
+                self.activePlayerName = isYT ? "YouTube" : "Chrome"
+                self.duration = parsedDuration
+                self.basePosition = parsedCurrent
+                self.lastTimestamp = Date()
+                self.playbackRate = isVideoPlaying ? 1.0 : 0.0
+                
+                self.loadBrowserArtwork(urlString: urlString, isYT: isYT)
+            } else if status == "info" && parts.count >= 3 {
+                var cleanTitle = parts[1]
+                    .replacingOccurrences(of: " - Google Chrome", with: "")
+                    .replacingOccurrences(of: " - YouTube", with: "")
+                    .replacingOccurrences(of: "YouTube - ", with: "")
+                    .trimmingCharacters(in: .whitespacesAndNewlines)
+                
+                if let pipeIdx = cleanTitle.lastIndex(of: "|") {
+                    cleanTitle = String(cleanTitle[..<pipeIdx]).trimmingCharacters(in: .whitespacesAndNewlines)
+                }
                 
                 let urlString = parts[2]
-                if let vIdx = urlString.range(of: "v=") {
-                    let idSubstring = urlString[vIdx.upperBound...]
-                    let videoId = String(idSubstring.prefix(while: { $0 != "&" && $0 != "#" && $0 != "?" }))
-                    if !videoId.isEmpty, let thumbUrl = URL(string: "https://img.youtube.com/vi/\(videoId)/hqdefault.jpg") {
-                        self.downloadImage(from: thumbUrl, cacheKey: videoId)
+                let isMedia = Self.isMediaUrl(urlString)
+                let isYT = urlString.contains("youtube.com") || parts[1].contains("YouTube")
+                let isNewMedia = (self.lastActiveUrl != urlString)
+                self.lastActiveUrl = urlString
+                
+                if isMedia {
+                    var parsedCurrent: Double = 0
+                    if let tRange = urlString.range(of: "t=") {
+                        let tSub = urlString[tRange.upperBound...]
+                        let tStr = String(tSub.prefix(while: { $0 != "&" && $0 != "#" && $0 != "?" }))
+                        parsedCurrent = Self.parseUrlTime(tStr)
+                    }
+                    
+                    if isYT, let vIdx = urlString.range(of: "v=") {
+                        let idSubstring = urlString[vIdx.upperBound...]
+                        let videoId = String(idSubstring.prefix(while: { $0 != "&" && $0 != "#" && $0 != "?" }))
+                        if !videoId.isEmpty {
+                            self.fetchYouTubeDuration(videoId: videoId)
+                        }
+                    }
+                    
+                    self.isPlaying = true
+                    self.title = cleanTitle.isEmpty ? (isYT ? "YouTube Video" : "Web Video / Film") : cleanTitle
+                    self.artist = isYT ? "YouTube (\(browserName))" : "Film / Dizi (\(browserName))"
+                    self.album = "Web Medya"
+                    self.activePlayerName = isYT ? "YouTube" : "Chrome"
+                    self.playbackRate = 1.0
+                    
+                    if isNewMedia {
+                        self.basePosition = parsedCurrent
+                        self.lastTimestamp = Date()
+                    } else if parsedCurrent > 0 && abs(parsedCurrent - self.currentPosition) > 10.0 {
+                        self.basePosition = parsedCurrent
+                        self.lastTimestamp = Date()
+                    }
+                    
+                    self.loadBrowserArtwork(urlString: urlString, isYT: isYT)
+                } else {
+                    self.isPlaying = false
+                    self.playbackRate = 0.0
+                    self.title = "Müzik Çalmıyor"
+                    self.artist = ""
+                    self.artwork = nil
+                    self.duration = 0.0
+                    self.basePosition = 0.0
+                }
+            } else if self.activePlayerName == "Chrome" || self.activePlayerName == "YouTube" {
+                self.isPlaying = false
+                self.playbackRate = 0.0
+                self.title = "Müzik Çalmıyor"
+                self.artist = ""
+                self.artwork = nil
+                self.duration = 0.0
+                self.basePosition = 0.0
+            }
+        }
+    }
+    
+    private func fetchYouTubeDuration(videoId: String) {
+        if let cached = youtubeDurationCache[videoId] {
+            DispatchQueue.main.async {
+                self.duration = cached
+            }
+            return
+        }
+        
+        guard let url = URL(string: "https://www.youtube.com/watch?v=\(videoId)") else { return }
+        var req = URLRequest(url: url)
+        req.setValue("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36", forHTTPHeaderField: "User-Agent")
+        URLSession.shared.dataTask(with: req) { [weak self] data, _, _ in
+            guard let data = data, let html = String(data: data, encoding: .utf8) else { return }
+            if let range = html.range(of: "\"lengthSeconds\":\"") {
+                let sub = html[range.upperBound...]
+                let numStr = String(sub.prefix(while: { $0.isNumber }))
+                if let sec = Double(numStr), sec > 0 {
+                    DispatchQueue.main.async {
+                        self?.youtubeDurationCache[videoId] = sec
+                        self?.duration = sec
                     }
                 }
-            } else {
-                self.isPlaying = false
+            }
+        }.resume()
+    }
+    
+    public static func isMediaUrl(_ urlString: String) -> Bool {
+        let lower = urlString.lowercased()
+        if lower.contains("youtube.com/watch") || lower.contains("youtu.be/") { return true }
+        if lower.contains("netflix.com/watch") { return true }
+        if lower.contains("myasiantv") && (lower.contains("/ep/") || lower.contains("/watch/")) { return true }
+        if lower.contains("/video/") || lower.contains("/watch/") || lower.contains("/stream/") || lower.contains("/ep/") { return true }
+        if lower.contains("vimeo.com/") || lower.contains("dailymotion.com/video") || lower.contains("twitch.tv/") { return true }
+        if lower.contains("soundcloud.com/") || lower.contains("music.apple.com") || lower.contains("open.spotify.com") { return true }
+        return false
+    }
+    
+    public static func parseUrlTime(_ text: String) -> Double {
+        var clean = text.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
+        if clean.hasSuffix("s") && !clean.contains("m") && !clean.contains("h") {
+            clean.removeLast()
+            return Double(clean) ?? 0.0
+        }
+        var total: Double = 0
+        if let hRange = clean.range(of: "h") {
+            let h = Double(clean[..<hRange.lowerBound]) ?? 0
+            total += h * 3600
+            clean = String(clean[hRange.upperBound...])
+        }
+        if let mRange = clean.range(of: "m") {
+            let m = Double(clean[..<mRange.lowerBound]) ?? 0
+            total += m * 60
+            clean = String(clean[mRange.upperBound...])
+        }
+        if clean.hasSuffix("s") {
+            clean.removeLast()
+        }
+        total += Double(clean) ?? 0
+        return total
+    }
+    
+    private func loadBrowserArtwork(urlString: String, isYT: Bool) {
+        var foundThumb = false
+        if isYT, let vIdx = urlString.range(of: "v=") {
+            let idSubstring = urlString[vIdx.upperBound...]
+            let videoId = String(idSubstring.prefix(while: { $0 != "&" && $0 != "#" && $0 != "?" }))
+            if !videoId.isEmpty, let thumbUrl = URL(string: "https://img.youtube.com/vi/\(videoId)/hqdefault.jpg") {
+                foundThumb = true
+                self.downloadImage(from: thumbUrl, cacheKey: videoId)
+            }
+        }
+        
+        if !foundThumb, let encodedUrl = urlString.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) {
+            let favUrlString = "https://t0.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=\(encodedUrl)&size=128"
+            if let favUrl = URL(string: favUrlString) {
+                self.downloadImage(from: favUrl, cacheKey: "fav_\(encodedUrl)")
             }
         }
     }
@@ -555,6 +732,19 @@ public final class NowPlayingManager {
             DispatchQueue.global(qos: .userInitiated).async { [weak self] in
                 self?.executeAppleScript(script) { _ in }
             }
+        } else if activePlayerName == "Chrome" || activePlayerName == "YouTube" {
+            let script = """
+            tell application "Google Chrome"
+                if it is running then
+                    try
+                        execute active tab of front window javascript "let v = document.querySelector('video'); if (v) v.currentTime = \(pos);"
+                    end try
+                end if
+            end tell
+            """
+            DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+                self?.executeAppleScript(script) { _ in }
+            }
         }
     }
     
@@ -589,6 +779,22 @@ public final class NowPlayingManager {
         Self.formatTime(duration)
     }
     
+    public static func parseTimeString(_ text: String) -> Double {
+        let clean = text.replacingOccurrences(of: ",", with: ".").trimmingCharacters(in: .whitespacesAndNewlines)
+        let parts = clean.components(separatedBy: ":")
+        if parts.count == 3 {
+            let h = Double(parts[0]) ?? 0
+            let m = Double(parts[1]) ?? 0
+            let s = Double(parts[2]) ?? 0
+            return h * 3600 + m * 60 + s
+        } else if parts.count == 2 {
+            let m = Double(parts[0]) ?? 0
+            let s = Double(parts[1]) ?? 0
+            return m * 60 + s
+        }
+        return parseNumeric(clean)
+    }
+    
     public static func parseNumeric(_ text: String) -> Double {
         let clean = text.replacingOccurrences(of: ",", with: ".").trimmingCharacters(in: .whitespacesAndNewlines)
         return Double(clean) ?? 0.0
@@ -597,8 +803,13 @@ public final class NowPlayingManager {
     public static func formatTime(_ seconds: Double) -> String {
         guard !seconds.isNaN && !seconds.isInfinite && seconds >= 0 else { return "0:00" }
         let totalSecs = Int(seconds)
-        let mins = totalSecs / 60
+        let hours = totalSecs / 3600
+        let mins = (totalSecs % 3600) / 60
         let secs = totalSecs % 60
-        return String(format: "%d:%02d", mins, secs)
+        if hours > 0 {
+            return String(format: "%d:%02d:%02d", hours, mins, secs)
+        } else {
+            return String(format: "%d:%02d", mins, secs)
+        }
     }
 }

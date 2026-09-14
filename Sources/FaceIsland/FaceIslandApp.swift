@@ -58,9 +58,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             // Apply Island display style (Notch or Floating capsule)
             SettingsManager.shared.applyIslandDisplayMode()
             
-            // On launch: trigger Face ID scan animation & unlock workflow if enrolled
+            // On launch: only trigger Face ID unlock workflow if screen is locked
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
-                if FaceRecognitionManager.shared.isEnrolled {
+                if ScreenLockMonitor.shared.isScreenLocked && FaceRecognitionManager.shared.isEnrolled {
                     AutoUnlocker.shared.triggerFaceScanForUnlock()
                 }
             }

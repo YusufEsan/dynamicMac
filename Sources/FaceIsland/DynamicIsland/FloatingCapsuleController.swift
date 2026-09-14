@@ -22,7 +22,7 @@ public final class FloatingCapsuleController {
     
     @discardableResult
     public static func handleScreenClick() -> Bool {
-        guard let window = FloatingCapsuleController.shared.window, window.isVisible else { return false }
+        guard let window = FloatingCapsuleController.shared.window, window.isVisible, SettingsManager.shared.forceFloatingCapsule else { return false }
         let mouseLoc = NSEvent.mouseLocation
         let windowFrame = window.frame
         let provider = IslandContentProvider.shared
@@ -40,23 +40,6 @@ public final class FloatingCapsuleController {
                 DispatchQueue.main.async {
                     withAnimation(AnimationConstants.islandMorphSpring) {
                         provider.collapse()
-                    }
-                }
-                return true
-            }
-        } else if case .compact = provider.expansionState {
-            let width: CGFloat = 360
-            let height: CGFloat = 65
-            let capsuleRect = CGRect(
-                x: windowFrame.midX - (width / 2.0),
-                y: windowFrame.maxY - height,
-                width: width,
-                height: height
-            )
-            if capsuleRect.contains(mouseLoc) {
-                DispatchQueue.main.async {
-                    withAnimation(AnimationConstants.islandMorphSpring) {
-                        provider.expansionState = .expanded(.music)
                     }
                 }
                 return true

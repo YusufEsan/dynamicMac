@@ -94,6 +94,12 @@ public struct IslandView: View {
                 } else {
                     compactNotchView
                         .transition(.opacity.combined(with: .scale(scale: 0.96)))
+                        .contentShape(Rectangle())
+                        .onTapGesture {
+                            withAnimation(AnimationConstants.islandMorphSpring) {
+                                IslandContentProvider.shared.toggleExpand()
+                            }
+                        }
                 }
             }
             .contentShape(Rectangle())
@@ -139,7 +145,7 @@ public struct IslandView: View {
     private var compactNotchView: some View {
         HStack(spacing: 8) {
             // Left Dynamic Icon: Only for music playback when active
-            if music.isPlaying {
+            if music.isPlaying || (!music.title.isEmpty && music.title != "Müzik Çalmıyor") {
                 if let art = music.artwork {
                     ZStack(alignment: .bottomTrailing) {
                         Image(nsImage: art)
@@ -190,19 +196,21 @@ public struct IslandView: View {
             // Center Live Text
             HStack {
                 Spacer(minLength: 0)
-                if faceRecognition.isScanning {
-                    Text("Face ID ile Taranıyor...")
-                        .font(.system(size: 11.5, weight: .semibold, design: .rounded))
-                        .foregroundColor(Color(red: 0.11, green: 0.84, blue: 0.38))
-                } else if faceRecognition.isRecognized {
-                    Text("Hoş Geldiniz, Kilit Açıldı")
-                        .font(.system(size: 11.5, weight: .bold, design: .rounded))
-                        .foregroundColor(Color(red: 0.11, green: 0.84, blue: 0.38))
-                } else if case .notRecognized = faceRecognition.currentState {
-                    Text("Yüz Tanınamadı")
-                        .font(.system(size: 11.5, weight: .bold, design: .rounded))
-                        .foregroundColor(.orange)
-                } else if music.isPlaying {
+                if ScreenLockMonitor.shared.isScreenLocked {
+                    if faceRecognition.isScanning {
+                        Text("Face ID ile Taranıyor...")
+                            .font(.system(size: 11.5, weight: .semibold, design: .rounded))
+                            .foregroundColor(Color(red: 0.11, green: 0.84, blue: 0.38))
+                    } else if faceRecognition.isRecognized {
+                        Text("Hoş Geldiniz, Kilit Açıldı")
+                            .font(.system(size: 11.5, weight: .bold, design: .rounded))
+                            .foregroundColor(Color(red: 0.11, green: 0.84, blue: 0.38))
+                    } else if case .notRecognized = faceRecognition.currentState {
+                        Text("Yüz Tanınamadı")
+                            .font(.system(size: 11.5, weight: .bold, design: .rounded))
+                            .foregroundColor(.orange)
+                    }
+                } else if music.isPlaying || (!music.title.isEmpty && music.title != "Müzik Çalmıyor") {
                     HStack(spacing: 4) {
                         Text(music.title)
                             .font(.system(size: 11.5, weight: .semibold, design: .rounded))
@@ -226,7 +234,7 @@ public struct IslandView: View {
             .frame(maxWidth: .infinity)
             
             // Right Status: Equalizer Bars / Face ID status / Retry button
-            if faceRecognition.isScanning {
+            if ScreenLockMonitor.shared.isScreenLocked && faceRecognition.isScanning {
                 HStack(spacing: 6) {
                     Image(systemName: "faceid")
                         .font(.system(size: 13, weight: .bold))
@@ -234,15 +242,15 @@ public struct IslandView: View {
                         .scaleEffect(pulseGlow ? 1.15 : 0.9)
                         .animation(.easeInOut(duration: 0.8).repeatForever(autoreverses: true), value: pulseGlow)
                 }
-            } else if faceRecognition.isRecognized {
+            } else if ScreenLockMonitor.shared.isScreenLocked && faceRecognition.isRecognized {
                 HStack(spacing: 5) {
                     Image(systemName: "checkmark.circle.fill")
                         .font(.system(size: 13, weight: .bold))
                         .foregroundColor(Color(red: 0.11, green: 0.84, blue: 0.38))
                 }
-            } else if case .notRecognized = faceRecognition.currentState {
+            } else if ScreenLockMonitor.shared.isScreenLocked, case .notRecognized = faceRecognition.currentState {
                 Button(action: {
-                    AutoUnlocker.shared.triggerFaceScanForUnlock()
+                    FaceRecognitionManager.shared.startRecognition()
                 }) {
                     HStack(spacing: 3.5) {
                         Image(systemName: "arrow.clockwise")
@@ -448,11 +456,11 @@ public struct IslandView: View {
                     islandSettingsAndPermissionsView
                         .padding(.horizontal, 28)
                         .padding(.bottom, 10)
-                        .frame(height: 194)
+                        .frame(height: tabContentHeight)
                         .transition(.opacity)
                 }
             }
-            .frame(height: activeTopTab == "Tray" ? 186 : (activeTopTab == "Settings" ? 194 : 92))
+            .frame(height: tabContentHeight)
         }
     }
     
@@ -584,8 +592,8 @@ public struct IslandView: View {
                 HStack(spacing: 8) {
                     Text(music.formattedPosition)
                         .font(.system(size: 9.5, weight: .medium, design: .monospaced))
-                        .foregroundColor(.white.opacity(0.6))
-                        .frame(width: 30, alignment: .trailing)
+                        .foregroundColor(.white.opacity(0.75))
+                        .fixedSize(horizontal: true, vertical: false)
                     
                     GeometryReader { geo in
                         let total = max(1.0, music.duration)
@@ -627,10 +635,10 @@ public struct IslandView: View {
                     }
                     .frame(height: 12)
                     
-                    Text(music.formattedDuration)
+                    Text(music.duration > 0 ? music.formattedDuration : (music.isPlaying ? "Canlı" : "0:00"))
                         .font(.system(size: 9.5, weight: .medium, design: .monospaced))
-                        .foregroundColor(.white.opacity(0.6))
-                        .frame(width: 30, alignment: .leading)
+                        .foregroundColor(.white.opacity(0.75))
+                        .fixedSize(horizontal: true, vertical: false)
                 }
                 .padding(.top, 2)
             }
@@ -796,13 +804,40 @@ public struct IslandView: View {
         }
     }
     
+    private var tabContentHeight: CGFloat {
+        switch activeTopTab {
+        case "Tray":
+            return 186
+        case "Settings":
+            switch settingsSubTab {
+            case "Style":
+                return 118
+            case "Permissions":
+                return 165
+            default: // "FaceID"
+                return 185
+            }
+        case "Calendar":
+            return 92
+        default: // "Music"
+            return 92
+        }
+    }
+    
     private var islandHeight: CGFloat {
         guard isExpanded else { return 35 }
         switch activeTopTab {
         case "Tray":
             return 240
         case "Settings":
-            return 250
+            switch settingsSubTab {
+            case "Style":
+                return 178
+            case "Permissions":
+                return 222
+            default: // "FaceID"
+                return 242
+            }
         case "Calendar":
             return 152
         default:
@@ -812,7 +847,7 @@ public struct IslandView: View {
     
     // MARK: - In-Island Settings & Face ID View
     private var islandSettingsAndPermissionsView: some View {
-        VStack(spacing: 8) {
+        VStack(alignment: .leading, spacing: 8) {
             // Sub-Bar Segments: [🛡️ Face ID & Kilit Açma] [🏝️ Ada Görünümü] [⚙️ Sistem İzinleri]
             HStack(spacing: 7) {
                 Button(action: {
@@ -916,26 +951,26 @@ public struct IslandView: View {
                     .buttonStyle(.plain)
                 }
             }
+            .frame(height: 26)
             
             // Sub-Panel Content
-            if settingsSubTab == "FaceID" {
-                faceIDSettingsPanel
-            } else if settingsSubTab == "Style" {
-                islandStylePanel
-            } else {
-                permissionsSettingsPanel
+            ZStack(alignment: .topLeading) {
+                if settingsSubTab == "FaceID" {
+                    faceIDSettingsPanel
+                } else if settingsSubTab == "Style" {
+                    islandStylePanel
+                } else {
+                    permissionsSettingsPanel
+                }
             }
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     }
     
     // MARK: - Island Style Dedicated In-Island Panel
     private var islandStylePanel: some View {
         VStack(spacing: 8) {
-            Text("Görünüm Seçeneği:")
-                .font(.system(size: 11, weight: .semibold, design: .rounded))
-                .foregroundColor(.white.opacity(0.7))
-                .frame(maxWidth: .infinity, alignment: .leading)
-            
             HStack(spacing: 10) {
                 // Option 1: Çentik Modu (Üste Yapışık)
                 Button(action: {
@@ -945,34 +980,42 @@ public struct IslandView: View {
                 }) {
                     VStack(alignment: .leading, spacing: 4) {
                         HStack {
-                            Image(systemName: "macbook.and.iphone")
-                                .font(.system(size: 13, weight: .bold))
-                                .foregroundColor(!settings.forceFloatingCapsule ? Color(red: 0.11, green: 0.84, blue: 0.38) : .white.opacity(0.5))
+                            ZStack(alignment: .top) {
+                                RoundedRectangle(cornerRadius: 3.5, style: .continuous)
+                                    .stroke(!settings.forceFloatingCapsule ? Color(red: 0.11, green: 0.84, blue: 0.38) : .white.opacity(0.45), lineWidth: 1.2)
+                                    .frame(width: 22, height: 14)
+                                
+                                // Notch attached to top
+                                Capsule()
+                                    .fill(!settings.forceFloatingCapsule ? Color(red: 0.11, green: 0.84, blue: 0.38) : .white.opacity(0.55))
+                                    .frame(width: 8, height: 3.5)
+                            }
+                            .frame(width: 22, height: 14)
                             
                             Spacer()
                             
                             if !settings.forceFloatingCapsule {
                                 Image(systemName: "checkmark.circle.fill")
-                                    .font(.system(size: 12, weight: .bold))
+                                    .font(.system(size: 13, weight: .bold))
                                     .foregroundColor(Color(red: 0.11, green: 0.84, blue: 0.38))
                             }
                         }
                         
                         Text("Çentik Adası (Ada)")
-                            .font(.system(size: 11.5, weight: .bold, design: .rounded))
+                            .font(.system(size: 12, weight: .bold, design: .rounded))
                             .foregroundColor(!settings.forceFloatingCapsule ? .white : .white.opacity(0.75))
                         
                         Text("Üste yapışık çentik adası")
-                            .font(.system(size: 9.5))
+                            .font(.system(size: 10))
                             .foregroundColor(.white.opacity(0.5))
                             .lineLimit(1)
                     }
-                    .padding(10)
-                    .frame(maxWidth: .infinity, minHeight: 70, alignment: .topLeading)
+                    .padding(12)
+                    .frame(maxWidth: .infinity, minHeight: 74, alignment: .topLeading)
                     .background(!settings.forceFloatingCapsule ? Color.green.opacity(0.20) : Color.white.opacity(0.05))
-                    .clipShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
+                    .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
                     .overlay(
-                        RoundedRectangle(cornerRadius: 9, style: .continuous)
+                        RoundedRectangle(cornerRadius: 10, style: .continuous)
                             .stroke(!settings.forceFloatingCapsule ? Color.green.opacity(0.65) : Color.white.opacity(0.10), lineWidth: 1.2)
                     )
                 }
@@ -986,40 +1029,49 @@ public struct IslandView: View {
                 }) {
                     VStack(alignment: .leading, spacing: 4) {
                         HStack {
-                            Image(systemName: "capsule.portrait.fill")
-                                .font(.system(size: 13, weight: .bold))
-                                .foregroundColor(settings.forceFloatingCapsule ? Color(red: 0.11, green: 0.84, blue: 0.38) : .white.opacity(0.5))
+                            ZStack(alignment: .center) {
+                                RoundedRectangle(cornerRadius: 3.5, style: .continuous)
+                                    .stroke(settings.forceFloatingCapsule ? Color(red: 0.11, green: 0.84, blue: 0.38) : .white.opacity(0.45), lineWidth: 1.2)
+                                    .frame(width: 22, height: 14)
+                                
+                                // Detached floating capsule
+                                Capsule()
+                                    .fill(settings.forceFloatingCapsule ? Color(red: 0.11, green: 0.84, blue: 0.38) : .white.opacity(0.55))
+                                    .frame(width: 9, height: 3.8)
+                            }
+                            .frame(width: 22, height: 14)
                             
                             Spacer()
                             
                             if settings.forceFloatingCapsule {
                                 Image(systemName: "checkmark.circle.fill")
-                                    .font(.system(size: 12, weight: .bold))
+                                    .font(.system(size: 13, weight: .bold))
                                     .foregroundColor(Color(red: 0.11, green: 0.84, blue: 0.38))
                             }
                         }
                         
                         Text("Yüzen Kapsül (Ayrı)")
-                            .font(.system(size: 11.5, weight: .bold, design: .rounded))
+                            .font(.system(size: 12, weight: .bold, design: .rounded))
                             .foregroundColor(settings.forceFloatingCapsule ? .white : .white.opacity(0.75))
                         
                         Text("Serbestçe taşınabilir ayrı ada")
-                            .font(.system(size: 9.5))
+                            .font(.system(size: 10))
                             .foregroundColor(.white.opacity(0.5))
                             .lineLimit(1)
                     }
-                    .padding(10)
-                    .frame(maxWidth: .infinity, minHeight: 70, alignment: .topLeading)
+                    .padding(12)
+                    .frame(maxWidth: .infinity, minHeight: 74, alignment: .topLeading)
                     .background(settings.forceFloatingCapsule ? Color.green.opacity(0.20) : Color.white.opacity(0.05))
-                    .clipShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
+                    .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
                     .overlay(
-                        RoundedRectangle(cornerRadius: 9, style: .continuous)
+                        RoundedRectangle(cornerRadius: 10, style: .continuous)
                             .stroke(settings.forceFloatingCapsule ? Color.green.opacity(0.65) : Color.white.opacity(0.10), lineWidth: 1.2)
                     )
                 }
                 .buttonStyle(.plain)
             }
         }
+        .frame(maxWidth: .infinity, alignment: .topLeading)
     }
     
     // MARK: - Face ID Dedicated In-Island Panel
@@ -1072,7 +1124,7 @@ public struct IslandView: View {
                     if faceRecognition.isEnrolled {
                         // Şimdi Tara Button - Matching Frosted Glass Capsule
                         Button(action: {
-                            AutoUnlocker.shared.triggerFaceScanForUnlock()
+                            FaceRecognitionManager.shared.startRecognition()
                         }) {
                             HStack(spacing: 4) {
                                 Image(systemName: "viewfinder")
@@ -1384,6 +1436,7 @@ public struct IslandView: View {
             }
             .buttonStyle(.plain)
         }
+        .frame(maxWidth: .infinity, alignment: .topLeading)
     }
     
     private func inIslandPermissionCard(
