@@ -141,11 +141,55 @@ public struct IslandView: View {
         return userName.isEmpty ? "Kullanıcı" : userName.capitalized
     }
     
+    private var isFaceIDActive: Bool {
+        ScreenLockMonitor.shared.isScreenLocked || faceRecognition.isScanning || faceRecognition.isRecognized || faceRecognition.currentState == .notRecognized
+    }
+    
     // MARK: - Compact Notch Idle Content
     private var compactNotchView: some View {
         HStack(spacing: 8) {
-            // Left Dynamic Icon: Only for music playback when active
-            if music.isPlaying || (!music.title.isEmpty && music.title != "Müzik Çalmıyor") {
+            // Left Dynamic Icon: Face ID gets absolute priority during scan/unlock
+            if isFaceIDActive {
+                if faceRecognition.isScanning {
+                    ZStack {
+                        Circle()
+                            .fill(Color(red: 0.11, green: 0.84, blue: 0.38).opacity(0.2))
+                            .frame(width: 20, height: 20)
+                        Image(systemName: "faceid")
+                            .font(.system(size: 11, weight: .bold))
+                            .foregroundColor(Color(red: 0.11, green: 0.84, blue: 0.38))
+                            .scaleEffect(pulseGlow ? 1.15 : 0.9)
+                            .animation(.easeInOut(duration: 0.8).repeatForever(autoreverses: true), value: pulseGlow)
+                    }
+                } else if faceRecognition.isRecognized {
+                    ZStack {
+                        Circle()
+                            .fill(Color(red: 0.11, green: 0.84, blue: 0.38))
+                            .frame(width: 20, height: 20)
+                        Image(systemName: "checkmark")
+                            .font(.system(size: 10, weight: .bold))
+                            .foregroundColor(.black)
+                    }
+                } else if case .notRecognized = faceRecognition.currentState {
+                    ZStack {
+                        Circle()
+                            .fill(Color.orange.opacity(0.25))
+                            .frame(width: 20, height: 20)
+                        Image(systemName: "exclamationmark")
+                            .font(.system(size: 10, weight: .bold))
+                            .foregroundColor(.orange)
+                    }
+                } else {
+                    ZStack {
+                        Circle()
+                            .fill(Color.white.opacity(0.12))
+                            .frame(width: 20, height: 20)
+                        Image(systemName: "lock.fill")
+                            .font(.system(size: 10, weight: .bold))
+                            .foregroundColor(.white.opacity(0.85))
+                    }
+                }
+            } else if music.isPlaying || (!music.title.isEmpty && music.title != "Müzik Çalmıyor") {
                 if let art = music.artwork {
                     ZStack(alignment: .bottomTrailing) {
                         Image(nsImage: art)
@@ -196,7 +240,7 @@ public struct IslandView: View {
             // Center Live Text
             HStack {
                 Spacer(minLength: 0)
-                if ScreenLockMonitor.shared.isScreenLocked {
+                if isFaceIDActive {
                     if faceRecognition.isScanning {
                         Text("Face ID ile Taranıyor...")
                             .font(.system(size: 11.5, weight: .semibold, design: .rounded))
@@ -209,6 +253,10 @@ public struct IslandView: View {
                         Text("Yüz Tanınamadı")
                             .font(.system(size: 11.5, weight: .bold, design: .rounded))
                             .foregroundColor(.orange)
+                    } else {
+                        Text("Ekran Kilitli")
+                            .font(.system(size: 11.5, weight: .semibold, design: .rounded))
+                            .foregroundColor(.white.opacity(0.85))
                     }
                 } else if music.isPlaying || (!music.title.isEmpty && music.title != "Müzik Çalmıyor") {
                     HStack(spacing: 4) {
@@ -234,37 +282,39 @@ public struct IslandView: View {
             .frame(maxWidth: .infinity)
             
             // Right Status: Equalizer Bars / Face ID status / Retry button
-            if ScreenLockMonitor.shared.isScreenLocked && faceRecognition.isScanning {
-                HStack(spacing: 6) {
-                    Image(systemName: "faceid")
-                        .font(.system(size: 13, weight: .bold))
-                        .foregroundColor(Color(red: 0.11, green: 0.84, blue: 0.38))
-                        .scaleEffect(pulseGlow ? 1.15 : 0.9)
-                        .animation(.easeInOut(duration: 0.8).repeatForever(autoreverses: true), value: pulseGlow)
-                }
-            } else if ScreenLockMonitor.shared.isScreenLocked && faceRecognition.isRecognized {
-                HStack(spacing: 5) {
-                    Image(systemName: "checkmark.circle.fill")
-                        .font(.system(size: 13, weight: .bold))
-                        .foregroundColor(Color(red: 0.11, green: 0.84, blue: 0.38))
-                }
-            } else if ScreenLockMonitor.shared.isScreenLocked, case .notRecognized = faceRecognition.currentState {
-                Button(action: {
-                    FaceRecognitionManager.shared.startRecognition()
-                }) {
-                    HStack(spacing: 3.5) {
-                        Image(systemName: "arrow.clockwise")
-                            .font(.system(size: 9, weight: .bold))
-                        Text("Tekrar Tara")
-                            .font(.system(size: 9.5, weight: .bold, design: .rounded))
+            if isFaceIDActive {
+                if faceRecognition.isScanning {
+                    HStack(spacing: 6) {
+                        Image(systemName: "faceid")
+                            .font(.system(size: 13, weight: .bold))
+                            .foregroundColor(Color(red: 0.11, green: 0.84, blue: 0.38))
+                            .scaleEffect(pulseGlow ? 1.15 : 0.9)
+                            .animation(.easeInOut(duration: 0.8).repeatForever(autoreverses: true), value: pulseGlow)
                     }
-                    .foregroundColor(.white)
-                    .padding(.horizontal, 7)
-                    .padding(.vertical, 3)
-                    .background(Color.orange.opacity(0.85))
-                    .clipShape(Capsule())
+                } else if faceRecognition.isRecognized {
+                    HStack(spacing: 5) {
+                        Image(systemName: "checkmark.circle.fill")
+                            .font(.system(size: 13, weight: .bold))
+                            .foregroundColor(Color(red: 0.11, green: 0.84, blue: 0.38))
+                    }
+                } else if case .notRecognized = faceRecognition.currentState {
+                    Button(action: {
+                        FaceRecognitionManager.shared.startRecognition()
+                    }) {
+                        HStack(spacing: 3.5) {
+                            Image(systemName: "arrow.clockwise")
+                                .font(.system(size: 9, weight: .bold))
+                            Text("Tekrar Tara")
+                                .font(.system(size: 9.5, weight: .bold, design: .rounded))
+                        }
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 7)
+                        .padding(.vertical, 3)
+                        .background(Color.orange.opacity(0.85))
+                        .clipShape(Capsule())
+                    }
+                    .buttonStyle(.plain)
                 }
-                .buttonStyle(.plain)
             } else if music.isPlaying {
                 animatedEqualizer(barCount: 4, height: 13)
             } else if calendarManager.nextEvent != nil {
