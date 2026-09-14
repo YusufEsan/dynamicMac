@@ -14,7 +14,7 @@ public final class FloatingCapsuleController {
     
     private func setupClickMonitors() {
         if globalClickMonitor == nil {
-            globalClickMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown]) { _ in
+            globalClickMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { _ in
                 FloatingCapsuleController.handleScreenClick()
             }
         }
@@ -26,7 +26,25 @@ public final class FloatingCapsuleController {
         let mouseLoc = NSEvent.mouseLocation
         let windowFrame = window.frame
         let provider = IslandContentProvider.shared
-        if case .compact = provider.expansionState {
+        
+        if case .expanded = provider.expansionState {
+            let width: CGFloat = 780
+            let height: CGFloat = 300
+            let expandedRect = CGRect(
+                x: windowFrame.midX - (width / 2.0),
+                y: windowFrame.maxY - height,
+                width: width,
+                height: height
+            )
+            if !expandedRect.contains(mouseLoc) {
+                DispatchQueue.main.async {
+                    withAnimation(AnimationConstants.islandMorphSpring) {
+                        provider.collapse()
+                    }
+                }
+                return true
+            }
+        } else if case .compact = provider.expansionState {
             let width: CGFloat = 360
             let height: CGFloat = 65
             let capsuleRect = CGRect(
@@ -67,12 +85,13 @@ public final class FloatingCapsuleController {
         )
         
         panel.isFloatingPanel = true
-        panel.level = NSWindow.Level(Int(CGShieldingWindowLevel()) + 1)
+        panel.level = NSWindow.Level(Int(CGWindowLevelForKey(.maximumWindow)))
         panel.backgroundColor = .clear
         panel.isOpaque = false
         panel.hasShadow = false
         panel.isMovableByWindowBackground = true
         panel.hidesOnDeactivate = false
+        panel.canHide = false
         panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .stationary, .ignoresCycle]
         panel.ignoresMouseEvents = false
         panel.becomesKeyOnlyIfNeeded = false

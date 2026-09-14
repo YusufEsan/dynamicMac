@@ -27,8 +27,22 @@ public final class ScreenLockMonitor {
         
         dnc.addObserver(
             self,
+            selector: #selector(screenLockedReceived),
+            name: NSNotification.Name("com.apple.loginwindow.screenIsLocked"),
+            object: nil
+        )
+        
+        dnc.addObserver(
+            self,
             selector: #selector(screenUnlockedReceived),
             name: NSNotification.Name("com.apple.screenIsUnlocked"),
+            object: nil
+        )
+        
+        dnc.addObserver(
+            self,
+            selector: #selector(screenUnlockedReceived),
+            name: NSNotification.Name("com.apple.loginwindow.screenIsUnlocked"),
             object: nil
         )
         
@@ -86,6 +100,32 @@ public final class ScreenLockMonitor {
             name: NSWorkspace.sessionDidBecomeActiveNotification,
             object: nil
         )
+        
+        startLockStatePolling()
+    }
+    
+    private var lockPollTimer: Timer?
+    
+    private func startLockStatePolling() {
+        lockPollTimer?.invalidate()
+        lockPollTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
+            self?.checkSystemLockState()
+        }
+    }
+    
+    public func checkSystemLockState() {
+        if let dict = CGSessionCopyCurrentDictionary() as? [String: Any] {
+            let locked = dict["CGSSessionScreenIsLocked"] as? Bool ?? false
+            if locked && !isScreenLocked {
+                isScreenLocked = true
+                AppLogger.info("🔒 Screen locked detected via CGSession", category: .unlock)
+                onScreenLocked?()
+            } else if !locked && isScreenLocked {
+                isScreenLocked = false
+                AppLogger.info("🔓 Screen unlocked detected via CGSession", category: .unlock)
+                onScreenUnlocked?()
+            }
+        }
     }
     
     @objc private func screenLockedReceived() {
@@ -118,6 +158,7 @@ public final class ScreenLockMonitor {
     
     @objc private func screenWokeReceived() {
         AppLogger.info("☀️ Screen wake detected", category: .unlock)
+        checkSystemLockState()
         onScreenWake?()
     }
     

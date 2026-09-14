@@ -138,44 +138,8 @@ public struct IslandView: View {
     // MARK: - Compact Notch Idle Content
     private var compactNotchView: some View {
         HStack(spacing: 8) {
-            // Left Dynamic Icon
-            if faceRecognition.isScanning {
-                ZStack {
-                    Circle()
-                        .fill(Color.cyan.opacity(0.25))
-                        .frame(width: 20, height: 20)
-                    
-                    Image(systemName: "viewfinder")
-                        .font(.system(size: 10, weight: .bold))
-                        .foregroundColor(.cyan)
-                }
-            } else if faceRecognition.isRecognized {
-                ZStack {
-                    Circle()
-                        .fill(Color(red: 0.11, green: 0.84, blue: 0.38).opacity(0.25))
-                        .frame(width: 20, height: 20)
-                    
-                    Image(systemName: "lock.open.fill")
-                        .font(.system(size: 10, weight: .bold))
-                        .foregroundColor(Color(red: 0.11, green: 0.84, blue: 0.38))
-                }
-            } else if case .notRecognized = faceRecognition.currentState {
-                Button(action: {
-                    AutoUnlocker.shared.triggerFaceScanForUnlock()
-                }) {
-                    ZStack {
-                        Circle()
-                            .fill(Color.orange.opacity(0.25))
-                            .frame(width: 20, height: 20)
-                        
-                        Image(systemName: "arrow.clockwise")
-                            .font(.system(size: 10, weight: .bold))
-                            .foregroundColor(.orange)
-                    }
-                }
-                .buttonStyle(.plain)
-                .help("Tekrar Tara")
-            } else if music.isPlaying {
+            // Left Dynamic Icon: Only for music playback when active
+            if music.isPlaying {
                 if let art = music.artwork {
                     ZStack(alignment: .bottomTrailing) {
                         Image(nsImage: art)
@@ -221,107 +185,60 @@ public struct IslandView: View {
                             .foregroundColor(.white)
                     }
                 }
-            } else {
-                Button(action: {
-                    if faceRecognition.isEnrolled {
-                        AutoUnlocker.shared.triggerFaceScanForUnlock()
-                    }
-                }) {
-                    ZStack {
-                        Circle()
-                            .fill(Color.white.opacity(0.12))
-                            .frame(width: 18, height: 18)
-                        
-                        Image(systemName: faceRecognition.isEnrolled ? "faceid" : "sparkles")
-                            .font(.system(size: 9.5, weight: .bold))
-                            .foregroundColor(.cyan)
-                    }
-                }
-                .buttonStyle(.plain)
-                .help(faceRecognition.isEnrolled ? "Face ID ile Tara" : "FaceIsland")
             }
             
             // Center Live Text
-            if faceRecognition.isScanning {
-                Text("Yüz Taranıyor...")
-                    .font(.system(size: 11.5, weight: .semibold, design: .rounded))
-                    .foregroundColor(.cyan)
-            } else if faceRecognition.isRecognized {
-                Text("Hoş Geldiniz, Kilit Açıldı")
-                    .font(.system(size: 11.5, weight: .bold, design: .rounded))
-                    .foregroundColor(Color(red: 0.11, green: 0.84, blue: 0.38))
-            } else if case .notRecognized = faceRecognition.currentState {
-                Text("Yüz Tanınamadı")
-                    .font(.system(size: 11.5, weight: .bold, design: .rounded))
-                    .foregroundColor(.orange)
-            } else if music.isPlaying {
-                HStack(spacing: 4) {
-                    Text(music.title)
+            HStack {
+                Spacer(minLength: 0)
+                if faceRecognition.isScanning {
+                    Text("Face ID ile Taranıyor...")
                         .font(.system(size: 11.5, weight: .semibold, design: .rounded))
-                        .foregroundColor(.white)
-                        .lineLimit(1)
-                    
-                    if !music.artist.isEmpty {
-                        Text("• \(music.artist)")
-                            .font(.system(size: 10, weight: .regular, design: .rounded))
-                            .foregroundColor(.white.opacity(0.6))
+                        .foregroundColor(Color(red: 0.11, green: 0.84, blue: 0.38))
+                } else if faceRecognition.isRecognized {
+                    Text("Hoş Geldiniz, Kilit Açıldı")
+                        .font(.system(size: 11.5, weight: .bold, design: .rounded))
+                        .foregroundColor(Color(red: 0.11, green: 0.84, blue: 0.38))
+                } else if case .notRecognized = faceRecognition.currentState {
+                    Text("Yüz Tanınamadı")
+                        .font(.system(size: 11.5, weight: .bold, design: .rounded))
+                        .foregroundColor(.orange)
+                } else if music.isPlaying {
+                    HStack(spacing: 4) {
+                        Text(music.title)
+                            .font(.system(size: 11.5, weight: .semibold, design: .rounded))
+                            .foregroundColor(.white)
                             .lineLimit(1)
+                        
+                        if !music.artist.isEmpty {
+                            Text("• \(music.artist)")
+                                .font(.system(size: 10, weight: .regular, design: .rounded))
+                                .foregroundColor(.white.opacity(0.6))
+                                .lineLimit(1)
+                        }
                     }
+                } else {
+                    Text("Merhaba, \(formattedUserName)")
+                        .font(.system(size: 12, weight: .semibold, design: .rounded))
+                        .foregroundColor(.white.opacity(0.95))
                 }
-            } else {
-                Text("Merhaba, \(formattedUserName)")
-                    .font(.system(size: 11.5, weight: .semibold, design: .rounded))
-                    .foregroundColor(.white.opacity(0.92))
+                Spacer(minLength: 0)
             }
-            
-            Spacer(minLength: 4)
+            .frame(maxWidth: .infinity)
             
             // Right Status: Equalizer Bars / Face ID status / Retry button
             if faceRecognition.isScanning {
                 HStack(spacing: 6) {
-                    HStack(spacing: 3) {
-                        Image(systemName: battery.batteryIcon)
-                            .font(.system(size: 9.5, weight: .bold))
-                            .foregroundColor(battery.batteryColor)
-                        Text("%\(battery.level)")
-                            .font(.system(size: 9.5, weight: .bold, design: .monospaced))
-                            .foregroundColor(battery.batteryColor)
-                    }
-                    .padding(.horizontal, 6)
-                    .padding(.vertical, 2.5)
-                    .background(Color.white.opacity(0.10))
-                    .clipShape(Capsule())
-                    
                     Image(systemName: "faceid")
-                        .font(.system(size: 12, weight: .bold))
-                        .foregroundColor(.cyan)
+                        .font(.system(size: 13, weight: .bold))
+                        .foregroundColor(Color(red: 0.11, green: 0.84, blue: 0.38))
                         .scaleEffect(pulseGlow ? 1.15 : 0.9)
                         .animation(.easeInOut(duration: 0.8).repeatForever(autoreverses: true), value: pulseGlow)
                 }
             } else if faceRecognition.isRecognized {
                 HStack(spacing: 5) {
-                    HStack(spacing: 3) {
-                        Image(systemName: "checkmark.circle.fill")
-                            .font(.system(size: 10.5, weight: .bold))
-                            .foregroundColor(Color(red: 0.11, green: 0.84, blue: 0.38))
-                        
-                        Text("%\(Int(faceRecognition.lastMatchScore * 100))")
-                            .font(.system(size: 9.5, weight: .bold, design: .monospaced))
-                            .foregroundColor(Color(red: 0.11, green: 0.84, blue: 0.38))
-                    }
-                    
-                    HStack(spacing: 2.5) {
-                        Image(systemName: battery.batteryIcon)
-                            .font(.system(size: 9, weight: .semibold))
-                            .foregroundColor(battery.batteryColor)
-                        Text("%\(battery.level)")
-                            .font(.system(size: 9.5, weight: .semibold, design: .monospaced))
-                            .foregroundColor(.white.opacity(0.75))
-                    }
-                    .padding(.horizontal, 5)
-                    .padding(.vertical, 2)
-                    .background(Color.white.opacity(0.08))
-                    .clipShape(Capsule())
+                    Image(systemName: "checkmark.circle.fill")
+                        .font(.system(size: 13, weight: .bold))
+                        .foregroundColor(Color(red: 0.11, green: 0.84, blue: 0.38))
                 }
             } else if case .notRecognized = faceRecognition.currentState {
                 Button(action: {
@@ -346,11 +263,6 @@ public struct IslandView: View {
                 Text(calendarManager.countdownString)
                     .font(.system(size: 10, weight: .bold, design: .monospaced))
                     .foregroundColor(.orange)
-            } else {
-                Image(systemName: "sparkles")
-                    .font(.system(size: 10))
-                    .foregroundColor(.white.opacity(0.4))
-                    .rotationEffect(.degrees(radarRotation))
             }
         }
         .padding(.horizontal, 28)
@@ -361,11 +273,11 @@ public struct IslandView: View {
     // MARK: - Pixel-Perfect Dashboard with 3 Full Dedicated Tabs
     private var nookDashboardView: some View {
         VStack(spacing: 8) {
-            // Top Bar: [🎵 Spotify] [📅 Takvim] [🧰 Tepsi] ... [⚙️] [✖]
+            // Top Bar: [🎵 Medya] [📅 Takvim] [🧰 Tepsi] ... [⚙️] [✖]
             HStack(spacing: 10) {
                 // 3 Segmented Pill Buttons
                 HStack(spacing: 7) {
-                    // 1. Spotify / Music Tab
+                    // 1. Media Tab (Spotify / YouTube / Apple Music / Browser)
                     Button(action: {
                         withAnimation(AnimationConstants.quickInteractive) {
                             activeTopTab = "Music"
@@ -374,26 +286,30 @@ public struct IslandView: View {
                         HStack(spacing: 4) {
                             if music.isSpotify {
                                 SpotifyLogoShape(size: 10, iconColor: activeTopTab == "Music" ? .green : .white.opacity(0.6))
-                            } else {
-                                Image(systemName: "music.note")
+                            } else if music.isYouTube {
+                                Image(systemName: "play.rectangle.fill")
                                     .font(.system(size: 10))
-                                    .foregroundColor(activeTopTab == "Music" ? .pink : .white.opacity(0.6))
+                                    .foregroundColor(activeTopTab == "Music" ? .red : .white.opacity(0.6))
+                            } else {
+                                Image(systemName: "play.tv.fill")
+                                    .font(.system(size: 10))
+                                    .foregroundColor(activeTopTab == "Music" ? Color(red: 0.11, green: 0.84, blue: 0.38) : .white.opacity(0.6))
                             }
-                            Text(music.isSpotify ? "Spotify" : "Müzik")
+                            Text("Medya")
                                 .font(.system(size: 11, weight: .bold, design: .rounded))
                         }
                         .padding(.horizontal, 10)
                         .padding(.vertical, 4.5)
                         .background(
                             activeTopTab == "Music" ?
-                            LinearGradient(colors: music.isSpotify ? [Color.green.opacity(0.35), Color.mint.opacity(0.18)] : [Color.pink.opacity(0.35), Color.purple.opacity(0.18)], startPoint: .topLeading, endPoint: .bottomTrailing) :
+                            LinearGradient(colors: music.isSpotify ? [Color.green.opacity(0.35), Color.mint.opacity(0.18)] : (music.isYouTube ? [Color.red.opacity(0.35), Color.orange.opacity(0.18)] : [Color(red: 0.11, green: 0.84, blue: 0.38).opacity(0.35), Color.mint.opacity(0.18)]), startPoint: .topLeading, endPoint: .bottomTrailing) :
                             LinearGradient(colors: [Color.white.opacity(0.06), Color.white.opacity(0.04)], startPoint: .topLeading, endPoint: .bottomTrailing)
                         )
                         .foregroundColor(activeTopTab == "Music" ? .white : .white.opacity(0.65))
                         .clipShape(Capsule())
                         .overlay(
                             Capsule()
-                                .stroke(activeTopTab == "Music" ? (music.isSpotify ? Color.green.opacity(0.5) : Color.pink.opacity(0.5)) : Color.clear, lineWidth: 1)
+                                .stroke(activeTopTab == "Music" ? (music.isSpotify ? Color.green.opacity(0.5) : (music.isYouTube ? Color.red.opacity(0.5) : Color(red: 0.11, green: 0.84, blue: 0.38).opacity(0.5))) : Color.clear, lineWidth: 1)
                         )
                     }
                     .buttonStyle(.plain)
@@ -471,13 +387,13 @@ public struct IslandView: View {
                 }) {
                     Image(systemName: "gearshape.fill")
                         .font(.system(size: 12))
-                        .foregroundColor(activeTopTab == "Settings" ? .cyan : .white.opacity(0.85))
+                        .foregroundColor(activeTopTab == "Settings" ? Color(red: 0.11, green: 0.84, blue: 0.38) : .white.opacity(0.85))
                         .padding(7)
-                        .background(activeTopTab == "Settings" ? Color.cyan.opacity(0.25) : Color.white.opacity(0.12))
+                        .background(activeTopTab == "Settings" ? Color.green.opacity(0.25) : Color.white.opacity(0.12))
                         .clipShape(Circle())
                         .overlay(
                             Circle()
-                                .stroke(activeTopTab == "Settings" ? Color.cyan.opacity(0.6) : Color.clear, lineWidth: 1)
+                                .stroke(activeTopTab == "Settings" ? Color.green.opacity(0.6) : Color.clear, lineWidth: 1)
                         )
                 }
                 .buttonStyle(.plain)
@@ -581,12 +497,16 @@ public struct IslandView: View {
                 // Official Badge
                 ZStack {
                     RoundedRectangle(cornerRadius: 5, style: .continuous)
-                        .fill(music.isSpotify ? Color(red: 0.11, green: 0.84, blue: 0.38) : Color.red)
+                        .fill(music.isSpotify ? Color(red: 0.11, green: 0.84, blue: 0.38) : (music.isYouTube ? Color.red : Color(red: 0.11, green: 0.84, blue: 0.38)))
                         .frame(width: 18, height: 18)
                         .shadow(color: (music.isSpotify ? Color(red: 0.11, green: 0.84, blue: 0.38) : Color.red).opacity(0.55), radius: 3, x: 0, y: 1)
                     
                     if music.isSpotify {
                         SpotifyLogoShape(size: 11.5, iconColor: .black)
+                    } else if music.isYouTube {
+                        Image(systemName: "play.rectangle.fill")
+                            .font(.system(size: 9, weight: .bold))
+                            .foregroundColor(.white)
                     } else {
                         Image(systemName: "music.note")
                             .font(.system(size: 8.5, weight: .bold))
@@ -642,7 +562,7 @@ public struct IslandView: View {
                         }) {
                             Image(systemName: music.isPlaying ? "pause.fill" : "play.fill")
                                 .font(.system(size: 15, weight: .bold))
-                                .foregroundColor(music.isPlaying ? (music.isSpotify ? Color(red: 0.11, green: 0.84, blue: 0.38) : music.themeColor) : .white)
+                                .foregroundColor(.white.opacity(0.85))
                         }
                         .buttonStyle(.plain)
                         
@@ -910,14 +830,14 @@ public struct IslandView: View {
                     .padding(.vertical, 4.5)
                     .background(
                         settingsSubTab == "FaceID" ?
-                        Color.cyan.opacity(0.28) :
+                        Color.green.opacity(0.24) :
                         Color.white.opacity(0.06)
                     )
-                    .foregroundColor(settingsSubTab == "FaceID" ? .cyan : .white.opacity(0.65))
+                    .foregroundColor(settingsSubTab == "FaceID" ? Color(red: 0.11, green: 0.84, blue: 0.38) : .white.opacity(0.65))
                     .clipShape(Capsule())
                     .overlay(
                         Capsule()
-                            .stroke(settingsSubTab == "FaceID" ? Color.cyan.opacity(0.55) : Color.clear, lineWidth: 1)
+                            .stroke(settingsSubTab == "FaceID" ? Color.green.opacity(0.55) : Color.clear, lineWidth: 1)
                     )
                 }
                 .buttonStyle(.plain)
@@ -937,14 +857,14 @@ public struct IslandView: View {
                     .padding(.vertical, 4.5)
                     .background(
                         settingsSubTab == "Style" ?
-                        Color.mint.opacity(0.28) :
+                        Color.green.opacity(0.24) :
                         Color.white.opacity(0.06)
                     )
-                    .foregroundColor(settingsSubTab == "Style" ? .mint : .white.opacity(0.65))
+                    .foregroundColor(settingsSubTab == "Style" ? Color(red: 0.11, green: 0.84, blue: 0.38) : .white.opacity(0.65))
                     .clipShape(Capsule())
                     .overlay(
                         Capsule()
-                            .stroke(settingsSubTab == "Style" ? Color.mint.opacity(0.55) : Color.clear, lineWidth: 1)
+                            .stroke(settingsSubTab == "Style" ? Color.green.opacity(0.55) : Color.clear, lineWidth: 1)
                     )
                 }
                 .buttonStyle(.plain)
@@ -964,14 +884,14 @@ public struct IslandView: View {
                     .padding(.vertical, 4.5)
                     .background(
                         settingsSubTab == "Permissions" ?
-                        Color.blue.opacity(0.32) :
+                        Color.green.opacity(0.24) :
                         Color.white.opacity(0.06)
                     )
-                    .foregroundColor(settingsSubTab == "Permissions" ? .white : .white.opacity(0.65))
+                    .foregroundColor(settingsSubTab == "Permissions" ? Color(red: 0.11, green: 0.84, blue: 0.38) : .white.opacity(0.65))
                     .clipShape(Capsule())
                     .overlay(
                         Capsule()
-                            .stroke(settingsSubTab == "Permissions" ? Color.blue.opacity(0.55) : Color.clear, lineWidth: 1)
+                            .stroke(settingsSubTab == "Permissions" ? Color.green.opacity(0.55) : Color.clear, lineWidth: 1)
                     )
                 }
                 .buttonStyle(.plain)
@@ -1027,14 +947,14 @@ public struct IslandView: View {
                         HStack {
                             Image(systemName: "macbook.and.iphone")
                                 .font(.system(size: 13, weight: .bold))
-                                .foregroundColor(!settings.forceFloatingCapsule ? .cyan : .white.opacity(0.5))
+                                .foregroundColor(!settings.forceFloatingCapsule ? Color(red: 0.11, green: 0.84, blue: 0.38) : .white.opacity(0.5))
                             
                             Spacer()
                             
                             if !settings.forceFloatingCapsule {
                                 Image(systemName: "checkmark.circle.fill")
                                     .font(.system(size: 12, weight: .bold))
-                                    .foregroundColor(.cyan)
+                                    .foregroundColor(Color(red: 0.11, green: 0.84, blue: 0.38))
                             }
                         }
                         
@@ -1049,11 +969,11 @@ public struct IslandView: View {
                     }
                     .padding(10)
                     .frame(maxWidth: .infinity, minHeight: 70, alignment: .topLeading)
-                    .background(!settings.forceFloatingCapsule ? Color.cyan.opacity(0.20) : Color.white.opacity(0.05))
+                    .background(!settings.forceFloatingCapsule ? Color.green.opacity(0.20) : Color.white.opacity(0.05))
                     .clipShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
                     .overlay(
                         RoundedRectangle(cornerRadius: 9, style: .continuous)
-                            .stroke(!settings.forceFloatingCapsule ? Color.cyan.opacity(0.65) : Color.white.opacity(0.10), lineWidth: 1.2)
+                            .stroke(!settings.forceFloatingCapsule ? Color.green.opacity(0.65) : Color.white.opacity(0.10), lineWidth: 1.2)
                     )
                 }
                 .buttonStyle(.plain)
@@ -1068,14 +988,14 @@ public struct IslandView: View {
                         HStack {
                             Image(systemName: "capsule.portrait.fill")
                                 .font(.system(size: 13, weight: .bold))
-                                .foregroundColor(settings.forceFloatingCapsule ? .mint : .white.opacity(0.5))
+                                .foregroundColor(settings.forceFloatingCapsule ? Color(red: 0.11, green: 0.84, blue: 0.38) : .white.opacity(0.5))
                             
                             Spacer()
                             
                             if settings.forceFloatingCapsule {
                                 Image(systemName: "checkmark.circle.fill")
                                     .font(.system(size: 12, weight: .bold))
-                                    .foregroundColor(.mint)
+                                    .foregroundColor(Color(red: 0.11, green: 0.84, blue: 0.38))
                             }
                         }
                         
@@ -1090,11 +1010,11 @@ public struct IslandView: View {
                     }
                     .padding(10)
                     .frame(maxWidth: .infinity, minHeight: 70, alignment: .topLeading)
-                    .background(settings.forceFloatingCapsule ? Color.mint.opacity(0.20) : Color.white.opacity(0.05))
+                    .background(settings.forceFloatingCapsule ? Color.green.opacity(0.20) : Color.white.opacity(0.05))
                     .clipShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
                     .overlay(
                         RoundedRectangle(cornerRadius: 9, style: .continuous)
-                            .stroke(settings.forceFloatingCapsule ? Color.mint.opacity(0.65) : Color.white.opacity(0.10), lineWidth: 1.2)
+                            .stroke(settings.forceFloatingCapsule ? Color.green.opacity(0.65) : Color.white.opacity(0.10), lineWidth: 1.2)
                     )
                 }
                 .buttonStyle(.plain)
@@ -1109,12 +1029,12 @@ public struct IslandView: View {
             HStack(spacing: 12) {
                 ZStack {
                     Circle()
-                        .fill(faceRecognition.isEnrolled ? Color.green.opacity(0.18) : Color.cyan.opacity(0.18))
+                        .fill(faceRecognition.isEnrolled ? Color.green.opacity(0.18) : Color.white.opacity(0.10))
                         .frame(width: 32, height: 32)
                     
                     Image(systemName: faceRecognition.isEnrolled ? "checkmark.circle.fill" : "faceid")
                         .font(.system(size: 16, weight: .bold))
-                        .foregroundColor(faceRecognition.isEnrolled ? .green : .cyan)
+                        .foregroundColor(faceRecognition.isEnrolled ? Color(red: 0.11, green: 0.84, blue: 0.38) : .white.opacity(0.85))
                 }
                 
                 VStack(alignment: .leading, spacing: 1.5) {
@@ -1130,28 +1050,33 @@ public struct IslandView: View {
                 Spacer()
                 
                 HStack(spacing: 7) {
+                    // Yeniden Eğit Button - Matching Frosted Glass Capsule
                     Button(action: {
                         showEnrollmentSheet = true
                     }) {
                         HStack(spacing: 4) {
                             Image(systemName: "camera.fill")
+                                .font(.system(size: 9.5))
                             Text(faceRecognition.isEnrolled ? "Yeniden Eğit" : "Yüzü Tanıt")
                         }
-                        .font(.system(size: 10.5, weight: .bold, design: .rounded))
-                        .foregroundColor(.black)
-                        .padding(.horizontal, 10)
+                        .font(.system(size: 10.5, weight: .semibold, design: .rounded))
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 9)
                         .padding(.vertical, 5)
-                        .background(Color.cyan)
+                        .background(Color.white.opacity(0.12))
                         .clipShape(Capsule())
+                        .overlay(Capsule().stroke(Color.white.opacity(0.15), lineWidth: 1))
                     }
                     .buttonStyle(.plain)
                     
                     if faceRecognition.isEnrolled {
+                        // Şimdi Tara Button - Matching Frosted Glass Capsule
                         Button(action: {
                             AutoUnlocker.shared.triggerFaceScanForUnlock()
                         }) {
                             HStack(spacing: 4) {
                                 Image(systemName: "viewfinder")
+                                    .font(.system(size: 9.5))
                                 Text("Şimdi Tara")
                             }
                             .font(.system(size: 10.5, weight: .semibold, design: .rounded))
@@ -1173,7 +1098,7 @@ public struct IslandView: View {
             .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
             .overlay(
                 RoundedRectangle(cornerRadius: 10, style: .continuous)
-                    .stroke(faceRecognition.isEnrolled ? Color.green.opacity(0.25) : Color.cyan.opacity(0.20), lineWidth: 1)
+                    .stroke(faceRecognition.isEnrolled ? Color.green.opacity(0.25) : Color.white.opacity(0.10), lineWidth: 1)
             )
             
             // Row 2: Auto-Unlock Switch & Mac Password Vault Authorization (Full Width Grid)
@@ -1198,7 +1123,7 @@ public struct IslandView: View {
                                 .foregroundColor(.white.opacity(0.92))
                             Text(settings.autoUnlockEnabled ? "Devrede (İzin Verildi)" : "Kapalı (Devre Dışı)")
                                 .font(.system(size: 9.5))
-                                .foregroundColor(settings.autoUnlockEnabled ? .green : .white.opacity(0.45))
+                                .foregroundColor(settings.autoUnlockEnabled ? Color(red: 0.11, green: 0.84, blue: 0.38) : .white.opacity(0.45))
                         }
                         
                         Spacer(minLength: 4)
@@ -1231,9 +1156,9 @@ public struct IslandView: View {
                 HStack(spacing: 8) {
                     Image(systemName: "key.fill")
                         .font(.system(size: 11))
-                        .foregroundColor(keychain.hasSavedPassword ? Color(red: 0.11, green: 0.84, blue: 0.38) : .orange)
+                        .foregroundColor(keychain.hasSavedPassword ? Color(red: 0.11, green: 0.84, blue: 0.38) : .white.opacity(0.6))
                         .frame(width: 24, height: 24)
-                        .background((keychain.hasSavedPassword ? Color.green : Color.orange).opacity(0.18))
+                        .background((keychain.hasSavedPassword ? Color.green : Color.white).opacity(0.16))
                         .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
                     
                     if keychain.hasSavedPassword && !isEditingPassword {
@@ -1243,7 +1168,7 @@ public struct IslandView: View {
                                 .foregroundColor(.white)
                             Text("Yetkilendirildi (AES-256)")
                                 .font(.system(size: 9.5))
-                                .foregroundColor(.green)
+                                .foregroundColor(Color(red: 0.11, green: 0.84, blue: 0.38))
                         }
                         
                         Spacer(minLength: 4)
@@ -1252,12 +1177,13 @@ public struct IslandView: View {
                             isEditingPassword = true
                         }) {
                             Text("Değiştir")
-                                .font(.system(size: 9.5, weight: .bold))
+                                .font(.system(size: 9.5, weight: .semibold, design: .rounded))
                                 .foregroundColor(.white.opacity(0.9))
                                 .padding(.horizontal, 8)
                                 .padding(.vertical, 4)
                                 .background(Color.white.opacity(0.12))
                                 .clipShape(Capsule())
+                                .overlay(Capsule().stroke(Color.white.opacity(0.15), lineWidth: 1))
                         }
                         .buttonStyle(.plain)
                         
@@ -1291,20 +1217,23 @@ public struct IslandView: View {
                         }
                         .frame(maxWidth: .infinity)
                         
+                        // Yetki Ver & Kaydet - Frosted Glass Button matching "Şimdi Tara"
                         Button(action: {
                             savePasswordAction()
                         }) {
-                            HStack(spacing: 3) {
+                            HStack(spacing: 4) {
                                 Image(systemName: "lock.shield.fill")
-                                    .font(.system(size: 8.5))
-                                Text("Yetki Ver & Kaydet")
-                                    .font(.system(size: 9.5, weight: .bold, design: .rounded))
+                                    .font(.system(size: 9))
+                                    .foregroundColor(Color(red: 0.11, green: 0.84, blue: 0.38))
+                                Text("Kaydet")
                             }
-                            .foregroundColor(.black)
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 4.5)
-                            .background(Color(red: 0.11, green: 0.84, blue: 0.38))
+                            .font(.system(size: 10.5, weight: .semibold, design: .rounded))
+                            .foregroundColor(.white)
+                            .padding(.horizontal, 9)
+                            .padding(.vertical, 5)
+                            .background(Color.white.opacity(0.12))
                             .clipShape(Capsule())
+                            .overlay(Capsule().stroke(Color.white.opacity(0.15), lineWidth: 1))
                         }
                         .buttonStyle(.plain)
                         
@@ -1325,35 +1254,35 @@ public struct IslandView: View {
                 .clipShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
                 .overlay(
                     RoundedRectangle(cornerRadius: 9, style: .continuous)
-                        .stroke(keychain.hasSavedPassword ? Color.green.opacity(0.25) : Color.orange.opacity(0.20), lineWidth: 1)
+                        .stroke(keychain.hasSavedPassword ? Color.green.opacity(0.25) : Color.white.opacity(0.10), lineWidth: 1)
                 )
             }
             .frame(maxWidth: .infinity)
             
-            // Row 3: Custom Luxury Sensitivity Slider Card (Full Width)
+            // Row 3: Custom Luxury Sensitivity Slider Card (Full Width with Green Accent)
             HStack(spacing: 10) {
                 Image(systemName: "slider.horizontal.3")
                     .font(.system(size: 11, weight: .bold))
-                    .foregroundColor(.cyan)
+                    .foregroundColor(Color(red: 0.11, green: 0.84, blue: 0.38))
                 
                 Text("Eşleşme Hassasiyeti")
                     .font(.system(size: 11, weight: .medium, design: .rounded))
                     .foregroundColor(.white.opacity(0.88))
                     .frame(width: 120, alignment: .leading)
                 
-                // Custom Gradient Glassmorphic Slider
+                // Custom Gradient Glassmorphic Slider (Green Emerald Gradient)
                 CustomSensitivitySlider(value: $settings.faceIDThreshold)
                     .frame(maxWidth: .infinity)
                 
                 HStack(spacing: 2) {
                     Text("%\(Int(settings.faceIDThreshold * 100))")
                         .font(.system(size: 11, weight: .bold, design: .monospaced))
-                        .foregroundColor(.cyan)
+                        .foregroundColor(Color(red: 0.11, green: 0.84, blue: 0.38))
                     
                     if abs(settings.faceIDThreshold - 0.78) < 0.01 {
                         Text("(İdeal)")
                             .font(.system(size: 8.5, weight: .semibold, design: .rounded))
-                            .foregroundColor(.green)
+                            .foregroundColor(Color(red: 0.11, green: 0.84, blue: 0.38))
                     }
                 }
                 .frame(width: 55, alignment: .trailing)
@@ -1555,7 +1484,7 @@ public struct CustomSensitivitySlider: View {
                 Capsule()
                     .fill(
                         LinearGradient(
-                            colors: [Color.blue, Color.cyan, Color(red: 0.11, green: 0.84, blue: 0.38)],
+                            colors: [Color(red: 0.11, green: 0.84, blue: 0.38).opacity(0.55), Color(red: 0.11, green: 0.84, blue: 0.38)],
                             startPoint: .leading,
                             endPoint: .trailing
                         )
@@ -1566,8 +1495,8 @@ public struct CustomSensitivitySlider: View {
                 Circle()
                     .fill(Color.white)
                     .frame(width: 15, height: 15)
-                    .overlay(Circle().stroke(Color.cyan, lineWidth: 2))
-                    .shadow(color: Color.cyan.opacity(0.7), radius: 4)
+                    .overlay(Circle().stroke(Color(red: 0.11, green: 0.84, blue: 0.38), lineWidth: 2))
+                    .shadow(color: Color(red: 0.11, green: 0.84, blue: 0.38).opacity(0.7), radius: 4)
                     .offset(x: max(0, min(width - 15, width * fraction - 7.5)))
             }
             .frame(height: 18)

@@ -30,8 +30,13 @@ public final class WindowSwitcherController {
         panel.level = .floating
         panel.backgroundColor = .clear
         panel.isOpaque = false
-        panel.hasShadow = true
-        panel.contentView = NSHostingView(rootView: WindowSwitcherView())
+        panel.hasShadow = false
+        panel.ignoresMouseEvents = false
+        
+        let hostingView = NSHostingView(rootView: WindowSwitcherView())
+        hostingView.wantsLayer = true
+        hostingView.layer?.backgroundColor = NSColor.clear.cgColor
+        panel.contentView = hostingView
         panel.center()
         self.window = panel
     }

@@ -24,7 +24,7 @@ public final class IslandWindowController {
     
     private func setupClickMonitors() {
         if globalClickMonitor == nil {
-            globalClickMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown]) { _ in
+            globalClickMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { _ in
                 IslandWindowController.handleScreenClick()
             }
         }
@@ -37,7 +37,24 @@ public final class IslandWindowController {
         let screenFrame = screen.frame
         
         let provider = IslandContentProvider.shared
-        if case .compact = provider.expansionState {
+        if case .expanded = provider.expansionState {
+            let expandedWidth: CGFloat = 780
+            let expandedHeight: CGFloat = 300
+            let expandedRect = CGRect(
+                x: screenFrame.midX - (expandedWidth / 2.0),
+                y: screenFrame.maxY - expandedHeight,
+                width: expandedWidth,
+                height: expandedHeight
+            )
+            if !expandedRect.contains(mouseLoc) {
+                DispatchQueue.main.async {
+                    withAnimation(AnimationConstants.islandMorphSpring) {
+                        provider.collapse()
+                    }
+                }
+                return true
+            }
+        } else if case .compact = provider.expansionState {
             let notchWidth: CGFloat = 400
             let notchHeight: CGFloat = 70
             let notchRect = CGRect(
@@ -47,9 +64,7 @@ public final class IslandWindowController {
                 height: notchHeight
             )
             let inside = notchRect.contains(mouseLoc)
-            print("🌍 [GlobalClick Notch] mouseLoc: \(mouseLoc), notchRect: \(notchRect), inside: \(inside)")
             if inside {
-                print("⚡ [GlobalClick Action] Expanding to music!")
                 DispatchQueue.main.async {
                     withAnimation(AnimationConstants.islandMorphSpring) {
                         provider.expansionState = .expanded(.music)
@@ -81,11 +96,12 @@ public final class IslandWindowController {
         )
         
         panel.isFloatingPanel = true
-        panel.level = NSWindow.Level(Int(CGShieldingWindowLevel()) + 1)
+        panel.level = NSWindow.Level(Int(CGWindowLevelForKey(.maximumWindow)))
         panel.backgroundColor = .clear
         panel.isOpaque = false
         panel.hasShadow = false
         panel.hidesOnDeactivate = false
+        panel.canHide = false
         panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .stationary, .ignoresCycle]
         panel.ignoresMouseEvents = false
         panel.becomesKeyOnlyIfNeeded = false

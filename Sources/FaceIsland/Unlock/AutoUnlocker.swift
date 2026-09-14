@@ -42,7 +42,41 @@ public final class AutoUnlocker {
     
     public func prepareIslandForLockOrWake() {
         DispatchQueue.main.async {
-            SettingsManager.shared.applyIslandDisplayMode()
+            let isFloating = SettingsManager.shared.forceFloatingCapsule
+            if isFloating {
+                IslandWindowController.shared.hide()
+                FloatingCapsuleController.shared.show()
+                FloatingCapsuleController.shared.window?.level = NSWindow.Level(Int(CGShieldingWindowLevel()) + 2)
+                FloatingCapsuleController.shared.window?.orderFrontRegardless()
+            } else {
+                FloatingCapsuleController.shared.hide()
+                IslandWindowController.shared.show()
+                IslandWindowController.shared.repositionWindow()
+                IslandWindowController.shared.window?.level = NSWindow.Level(Int(CGShieldingWindowLevel()) + 2)
+                IslandWindowController.shared.window?.orderFrontRegardless()
+            }
+        }
+        
+        // Ensure front ordering remains after macOS space transition to loginwindow
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+            let isFloating = SettingsManager.shared.forceFloatingCapsule
+            if isFloating {
+                IslandWindowController.shared.hide()
+                FloatingCapsuleController.shared.window?.orderFrontRegardless()
+            } else {
+                FloatingCapsuleController.shared.hide()
+                IslandWindowController.shared.window?.orderFrontRegardless()
+            }
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.40) {
+            let isFloating = SettingsManager.shared.forceFloatingCapsule
+            if isFloating {
+                IslandWindowController.shared.hide()
+                FloatingCapsuleController.shared.window?.orderFrontRegardless()
+            } else {
+                FloatingCapsuleController.shared.hide()
+                IslandWindowController.shared.window?.orderFrontRegardless()
+            }
         }
     }
     
