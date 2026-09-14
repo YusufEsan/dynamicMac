@@ -31,6 +31,12 @@ public final class FaceEnrollmentManager: NSObject, CameraManagerDelegate {
     public var latestPreviewImage: NSImage? = nil
     
     private var isCapturingSample = false
+    private let ciContext = CIContext(options: [
+        .useSoftwareRenderer: false,
+        .priorityRequestLow: false
+    ])
+    private var lastPreviewTime: TimeInterval = 0
+    private let analysisQueue = DispatchQueue(label: "com.faceisland.enrollmentAnalysis", qos: .userInteractive)
     
     public override init() {
         super.init()
@@ -59,36 +65,46 @@ public final class FaceEnrollmentManager: NSObject, CameraManagerDelegate {
     public func cameraManager(_ manager: CameraManager, didOutput pixelBuffer: CVPixelBuffer) {
         guard isEnrolling, !isCapturingSample else { return }
         
-        let ciImage = CIImage(cvPixelBuffer: pixelBuffer)
-        let rep = NSCIImageRep(ciImage: ciImage)
-        let nsImage = NSImage(size: rep.size)
-        nsImage.addRepresentation(rep)
-        
-        DispatchQueue.main.async {
-            self.latestPreviewImage = nsImage
+        let now = ProcessInfo.processInfo.systemUptime
+        // Render smooth 25 FPS preview with hardware GPU acceleration
+        if now - lastPreviewTime > 0.04 {
+            lastPreviewTime = now
+            let ciImage = CIImage(cvPixelBuffer: pixelBuffer)
+            if let cgImage = ciContext.createCGImage(ciImage, from: ciImage.extent) {
+                let nsImage = NSImage(cgImage: cgImage, size: NSSize(width: 320, height: 240))
+                DispatchQueue.main.async {
+                    self.latestPreviewImage = nsImage
+                }
+            }
         }
         
-        let landmarksRequest = VNDetectFaceLandmarksRequest()
-        let handler = VNImageRequestHandler(cvPixelBuffer: pixelBuffer, orientation: .up, options: [:])
-        
-        do {
-            try handler.perform([landmarksRequest])
-            guard let results = landmarksRequest.results, let face = results.first else {
-                DispatchQueue.main.async {
-                    self.statusMessage = "Position your face in the camera view"
-                }
-                return
-            }
+        analysisQueue.async { [weak self] in
+            guard let self = self, self.isEnrolling, !self.isCapturingSample else { return }
             
-            if let embedding = FaceEmbedding.from(observation: face) {
-                isCapturingSample = true
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
-                    self.processSample(embedding)
-                    self.isCapturingSample = false
+            let landmarksRequest = VNDetectFaceLandmarksRequest()
+            let handler = VNImageRequestHandler(cvPixelBuffer: pixelBuffer, orientation: .up, options: [:])
+            
+            do {
+                try handler.perform([landmarksRequest])
+                guard let results = landmarksRequest.results, let face = results.first else {
+                    DispatchQueue.main.async {
+                        if self.currentStep != .completed {
+                            self.statusMessage = "Yüzünüzü kamera alanına hizalayın"
+                        }
+                    }
+                    return
                 }
+                
+                if let embedding = FaceEmbedding.from(observation: face) {
+                    self.isCapturingSample = true
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.45) {
+                        self.processSample(embedding)
+                        self.isCapturingSample = false
+                    }
+                }
+            } catch {
+                AppLogger.error("Enrollment frame analysis failed: \(error)", category: .faceID)
             }
-        } catch {
-            AppLogger.error("Enrollment frame analysis failed: \(error)", category: .faceID)
         }
     }
     
@@ -114,7 +130,7 @@ public final class FaceEnrollmentManager: NSObject, CameraManagerDelegate {
         FaceRecognitionManager.shared.saveEnrolledFaces(capturedSamples)
         AppLogger.info("Saved \(capturedSamples.count) Face ID embeddings to secure store", category: .faceID)
         
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) {
             self.isEnrolling = false
             CameraManager.shared.stopCapture()
         }

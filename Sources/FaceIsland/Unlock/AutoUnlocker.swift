@@ -59,36 +59,48 @@ public final class AutoUnlocker {
     }
     
     public func executeUnlock() {
-        guard let password = KeychainHelper.shared.getPassword() else {
-            AppLogger.error("Cannot unlock: No password stored in Keychain", category: .unlock)
+        guard let password = KeychainHelper.shared.getPassword(), !password.isEmpty else {
+            AppLogger.error("Cannot unlock: No password stored in secure vault", category: .unlock)
             return
         }
         
-        AppLogger.info("Attempting automatic screen unlock...", category: .unlock)
+        AppLogger.info("Attempting automatic screen unlock with AES-256 vault credentials...", category: .unlock)
         
         DispatchQueue.global(qos: .userInteractive).async {
-            // Send keystrokes via CGEvent to unlock macOS lock screen
+            let source = CGEventSource(stateID: .hidSystemState)
+            
+            // 1. Wake & focus lock screen password field
+            if let spaceDown = CGEvent(keyboardEventSource: source, virtualKey: 49, keyDown: true),
+               let spaceUp = CGEvent(keyboardEventSource: source, virtualKey: 49, keyDown: false) {
+                spaceDown.post(tap: .cghidEventTap)
+                usleep(15000)
+                spaceUp.post(tap: .cghidEventTap)
+                usleep(120000) // 120ms to ensure lockscreen textfield is active and focused
+            }
+            
+            // 2. Dispatch password unicode characters
             for char in password {
                 let uniChar = Array(String(char).utf16)
-                if let eventDown = CGEvent(keyboardEventSource: nil, virtualKey: 0, keyDown: true) {
+                if let eventDown = CGEvent(keyboardEventSource: source, virtualKey: 0, keyDown: true) {
                     eventDown.keyboardSetUnicodeString(stringLength: uniChar.count, unicodeString: uniChar)
                     eventDown.post(tap: .cghidEventTap)
                 }
-                usleep(15000)
-                if let eventUp = CGEvent(keyboardEventSource: nil, virtualKey: 0, keyDown: false) {
+                usleep(20000)
+                if let eventUp = CGEvent(keyboardEventSource: source, virtualKey: 0, keyDown: false) {
                     eventUp.keyboardSetUnicodeString(stringLength: uniChar.count, unicodeString: uniChar)
                     eventUp.post(tap: .cghidEventTap)
                 }
-                usleep(15000)
+                usleep(20000)
             }
             
-            // Post Return Key (virtual key 36 / 0x24)
-            usleep(50000)
-            let returnDown = CGEvent(keyboardEventSource: nil, virtualKey: 36, keyDown: true)
-            returnDown?.post(tap: .cghidEventTap)
-            usleep(20000)
-            let returnUp = CGEvent(keyboardEventSource: nil, virtualKey: 36, keyDown: false)
-            returnUp?.post(tap: .cghidEventTap)
+            // 3. Post Return Key (virtual key 36 / 0x24) to submit unlock
+            usleep(60000)
+            if let returnDown = CGEvent(keyboardEventSource: source, virtualKey: 36, keyDown: true),
+               let returnUp = CGEvent(keyboardEventSource: source, virtualKey: 36, keyDown: false) {
+                returnDown.post(tap: .cghidEventTap)
+                usleep(25000)
+                returnUp.post(tap: .cghidEventTap)
+            }
             
             AppLogger.info("Unlock keystrokes dispatched successfully", category: .unlock)
         }
