@@ -893,20 +893,20 @@ public struct IslandView: View {
     // MARK: - In-Island Settings & Face ID View
     private var islandSettingsAndPermissionsView: some View {
         VStack(spacing: 8) {
-            // Sub-Bar Segments: [🛡️ Face ID & Kilit Açma] [⚙️ Sistem İzinleri]
-            HStack(spacing: 8) {
+            // Sub-Bar Segments: [🛡️ Face ID & Kilit Açma] [🏝️ Ada Görünümü] [⚙️ Sistem İzinleri]
+            HStack(spacing: 7) {
                 Button(action: {
                     withAnimation(AnimationConstants.quickInteractive) {
                         settingsSubTab = "FaceID"
                     }
                 }) {
-                    HStack(spacing: 5) {
+                    HStack(spacing: 4) {
                         Image(systemName: "faceid")
                             .font(.system(size: 11, weight: .bold))
-                        Text("Face ID & Oturum")
-                            .font(.system(size: 11, weight: .bold, design: .rounded))
+                        Text("Face ID")
+                            .font(.system(size: 10.5, weight: .bold, design: .rounded))
                     }
-                    .padding(.horizontal, 10)
+                    .padding(.horizontal, 9)
                     .padding(.vertical, 4.5)
                     .background(
                         settingsSubTab == "FaceID" ?
@@ -924,16 +924,43 @@ public struct IslandView: View {
                 
                 Button(action: {
                     withAnimation(AnimationConstants.quickInteractive) {
+                        settingsSubTab = "Style"
+                    }
+                }) {
+                    HStack(spacing: 4) {
+                        Image(systemName: "square.dashed")
+                            .font(.system(size: 11, weight: .bold))
+                        Text("Ada Stili")
+                            .font(.system(size: 10.5, weight: .bold, design: .rounded))
+                    }
+                    .padding(.horizontal, 9)
+                    .padding(.vertical, 4.5)
+                    .background(
+                        settingsSubTab == "Style" ?
+                        Color.mint.opacity(0.28) :
+                        Color.white.opacity(0.06)
+                    )
+                    .foregroundColor(settingsSubTab == "Style" ? .mint : .white.opacity(0.65))
+                    .clipShape(Capsule())
+                    .overlay(
+                        Capsule()
+                            .stroke(settingsSubTab == "Style" ? Color.mint.opacity(0.55) : Color.clear, lineWidth: 1)
+                    )
+                }
+                .buttonStyle(.plain)
+                
+                Button(action: {
+                    withAnimation(AnimationConstants.quickInteractive) {
                         settingsSubTab = "Permissions"
                     }
                 }) {
-                    HStack(spacing: 5) {
+                    HStack(spacing: 4) {
                         Image(systemName: "hand.raised.badge.checkmark")
                             .font(.system(size: 11, weight: .bold))
-                        Text("Sistem İzinleri")
-                            .font(.system(size: 11, weight: .bold, design: .rounded))
+                        Text("İzinler")
+                            .font(.system(size: 10.5, weight: .bold, design: .rounded))
                     }
-                    .padding(.horizontal, 10)
+                    .padding(.horizontal, 9)
                     .padding(.vertical, 4.5)
                     .background(
                         settingsSubTab == "Permissions" ?
@@ -973,8 +1000,104 @@ public struct IslandView: View {
             // Sub-Panel Content
             if settingsSubTab == "FaceID" {
                 faceIDSettingsPanel
+            } else if settingsSubTab == "Style" {
+                islandStylePanel
             } else {
                 permissionsSettingsPanel
+            }
+        }
+    }
+    
+    // MARK: - Island Style Dedicated In-Island Panel
+    private var islandStylePanel: some View {
+        VStack(spacing: 8) {
+            Text("Görünüm Seçeneği:")
+                .font(.system(size: 11, weight: .semibold, design: .rounded))
+                .foregroundColor(.white.opacity(0.7))
+                .frame(maxWidth: .infinity, alignment: .leading)
+            
+            HStack(spacing: 10) {
+                // Option 1: Çentik Modu (Üste Yapışık)
+                Button(action: {
+                    withAnimation(.spring(response: 0.28, dampingFraction: 0.7)) {
+                        settings.forceFloatingCapsule = false
+                    }
+                }) {
+                    VStack(alignment: .leading, spacing: 4) {
+                        HStack {
+                            Image(systemName: "macbook.and.iphone")
+                                .font(.system(size: 13, weight: .bold))
+                                .foregroundColor(!settings.forceFloatingCapsule ? .cyan : .white.opacity(0.5))
+                            
+                            Spacer()
+                            
+                            if !settings.forceFloatingCapsule {
+                                Image(systemName: "checkmark.circle.fill")
+                                    .font(.system(size: 12, weight: .bold))
+                                    .foregroundColor(.cyan)
+                            }
+                        }
+                        
+                        Text("Çentik Adası (Ada)")
+                            .font(.system(size: 11.5, weight: .bold, design: .rounded))
+                            .foregroundColor(!settings.forceFloatingCapsule ? .white : .white.opacity(0.75))
+                        
+                        Text("Üste yapışık çentik adası")
+                            .font(.system(size: 9.5))
+                            .foregroundColor(.white.opacity(0.5))
+                            .lineLimit(1)
+                    }
+                    .padding(10)
+                    .frame(maxWidth: .infinity, minHeight: 70, alignment: .topLeading)
+                    .background(!settings.forceFloatingCapsule ? Color.cyan.opacity(0.20) : Color.white.opacity(0.05))
+                    .clipShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 9, style: .continuous)
+                            .stroke(!settings.forceFloatingCapsule ? Color.cyan.opacity(0.65) : Color.white.opacity(0.10), lineWidth: 1.2)
+                    )
+                }
+                .buttonStyle(.plain)
+                
+                // Option 2: Yüzen Kapsül (Ayrı)
+                Button(action: {
+                    withAnimation(.spring(response: 0.28, dampingFraction: 0.7)) {
+                        settings.forceFloatingCapsule = true
+                    }
+                }) {
+                    VStack(alignment: .leading, spacing: 4) {
+                        HStack {
+                            Image(systemName: "capsule.portrait.fill")
+                                .font(.system(size: 13, weight: .bold))
+                                .foregroundColor(settings.forceFloatingCapsule ? .mint : .white.opacity(0.5))
+                            
+                            Spacer()
+                            
+                            if settings.forceFloatingCapsule {
+                                Image(systemName: "checkmark.circle.fill")
+                                    .font(.system(size: 12, weight: .bold))
+                                    .foregroundColor(.mint)
+                            }
+                        }
+                        
+                        Text("Yüzen Kapsül (Ayrı)")
+                            .font(.system(size: 11.5, weight: .bold, design: .rounded))
+                            .foregroundColor(settings.forceFloatingCapsule ? .white : .white.opacity(0.75))
+                        
+                        Text("Serbestçe taşınabilir ayrı ada")
+                            .font(.system(size: 9.5))
+                            .foregroundColor(.white.opacity(0.5))
+                            .lineLimit(1)
+                    }
+                    .padding(10)
+                    .frame(maxWidth: .infinity, minHeight: 70, alignment: .topLeading)
+                    .background(settings.forceFloatingCapsule ? Color.mint.opacity(0.20) : Color.white.opacity(0.05))
+                    .clipShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 9, style: .continuous)
+                            .stroke(settings.forceFloatingCapsule ? Color.mint.opacity(0.65) : Color.white.opacity(0.10), lineWidth: 1.2)
+                    )
+                }
+                .buttonStyle(.plain)
             }
         }
     }
@@ -982,7 +1105,7 @@ public struct IslandView: View {
     // MARK: - Face ID Dedicated In-Island Panel
     private var faceIDSettingsPanel: some View {
         VStack(spacing: 7) {
-            // Row 1: Profile Status Card & Quick Actions
+            // Row 1: Profile Status Card & Quick Actions (Full Width)
             HStack(spacing: 12) {
                 ZStack {
                     Circle()
@@ -1045,6 +1168,7 @@ public struct IslandView: View {
             }
             .padding(.horizontal, 12)
             .padding(.vertical, 6.5)
+            .frame(maxWidth: .infinity)
             .background(Color.white.opacity(0.06))
             .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
             .overlay(
@@ -1052,8 +1176,8 @@ public struct IslandView: View {
                     .stroke(faceRecognition.isEnrolled ? Color.green.opacity(0.25) : Color.cyan.opacity(0.20), lineWidth: 1)
             )
             
-            // Row 2: Auto-Unlock Toggle + Keychain Password
-            HStack(spacing: 10) {
+            // Row 2: Auto-Unlock Switch & Mac Password Vault Authorization (Full Width Grid)
+            HStack(spacing: 8) {
                 // Left: Oto-Kilit Aç Switch Card
                 Button(action: {
                     withAnimation(.spring(response: 0.28, dampingFraction: 0.7)) {
@@ -1064,7 +1188,7 @@ public struct IslandView: View {
                         Image(systemName: "lock.open.fill")
                             .font(.system(size: 11))
                             .foregroundColor(settings.autoUnlockEnabled ? Color(red: 0.11, green: 0.84, blue: 0.38) : .white.opacity(0.5))
-                            .frame(width: 22, height: 22)
+                            .frame(width: 24, height: 24)
                             .background(settings.autoUnlockEnabled ? Color.green.opacity(0.20) : Color.white.opacity(0.08))
                             .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
                         
@@ -1072,10 +1196,12 @@ public struct IslandView: View {
                             Text("Oto-Kilit Aç")
                                 .font(.system(size: 11, weight: .semibold, design: .rounded))
                                 .foregroundColor(.white.opacity(0.92))
-                            Text(settings.autoUnlockEnabled ? "Devrede" : "Kapalı")
+                            Text(settings.autoUnlockEnabled ? "Devrede (İzin Verildi)" : "Kapalı (Devre Dışı)")
                                 .font(.system(size: 9.5))
                                 .foregroundColor(settings.autoUnlockEnabled ? .green : .white.opacity(0.45))
                         }
+                        
+                        Spacer(minLength: 4)
                         
                         ZStack(alignment: settings.autoUnlockEnabled ? .trailing : .leading) {
                             Capsule()
@@ -1088,10 +1214,10 @@ public struct IslandView: View {
                                 .frame(width: 13, height: 13)
                                 .padding(2)
                         }
-                        .padding(.leading, 3)
                     }
                     .padding(.horizontal, 10)
                     .padding(.vertical, 6)
+                    .frame(maxWidth: .infinity, minHeight: 46)
                     .background(Color.white.opacity(0.06))
                     .clipShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
                     .overlay(
@@ -1101,26 +1227,26 @@ public struct IslandView: View {
                 }
                 .buttonStyle(.plain)
                 
-                // Right: Keychain Password Card
+                // Right: Mac Şifresi & İzin / Yetki Korumalı Kasa Card
                 HStack(spacing: 8) {
                     Image(systemName: "key.fill")
                         .font(.system(size: 11))
-                        .foregroundColor(keychain.hasSavedPassword ? .green : .orange)
-                        .frame(width: 22, height: 22)
+                        .foregroundColor(keychain.hasSavedPassword ? Color(red: 0.11, green: 0.84, blue: 0.38) : .orange)
+                        .frame(width: 24, height: 24)
                         .background((keychain.hasSavedPassword ? Color.green : Color.orange).opacity(0.18))
                         .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
                     
                     if keychain.hasSavedPassword && !isEditingPassword {
                         VStack(alignment: .leading, spacing: 1) {
-                            Text("Mac Şifresi")
+                            Text("Mac Şifresi & İzni")
                                 .font(.system(size: 11, weight: .semibold, design: .rounded))
                                 .foregroundColor(.white)
-                            Text("Keychain'de Saklı")
+                            Text("Yetkilendirildi (AES-256)")
                                 .font(.system(size: 9.5))
                                 .foregroundColor(.green)
                         }
                         
-                        Spacer(minLength: 2)
+                        Spacer(minLength: 4)
                         
                         Button(action: {
                             isEditingPassword = true
@@ -1150,29 +1276,35 @@ public struct IslandView: View {
                         }
                         .buttonStyle(.plain)
                     } else {
-                        SecureField("Mac Şifreniz", text: $unlockPasswordInput)
-                            .textFieldStyle(.plain)
-                            .font(.system(size: 11, design: .monospaced))
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 4.5)
-                            .background(Color.black.opacity(0.6))
-                            .clipShape(RoundedRectangle(cornerRadius: 6))
-                            .overlay(RoundedRectangle(cornerRadius: 6).stroke(Color.white.opacity(0.20), lineWidth: 1))
-                            .frame(maxWidth: 150)
-                            .onSubmit {
-                                savePasswordAction()
-                            }
+                        VStack(alignment: .leading, spacing: 0) {
+                            SecureField("Mac Şifreniz", text: $unlockPasswordInput)
+                                .textFieldStyle(.plain)
+                                .font(.system(size: 11, design: .monospaced))
+                                .padding(.horizontal, 7)
+                                .padding(.vertical, 4)
+                                .background(Color.black.opacity(0.6))
+                                .clipShape(RoundedRectangle(cornerRadius: 6))
+                                .overlay(RoundedRectangle(cornerRadius: 6).stroke(Color.white.opacity(0.20), lineWidth: 1))
+                                .onSubmit {
+                                    savePasswordAction()
+                                }
+                        }
+                        .frame(maxWidth: .infinity)
                         
                         Button(action: {
                             savePasswordAction()
                         }) {
-                            Text("Kaydet")
-                                .font(.system(size: 10.5, weight: .bold, design: .rounded))
-                                .foregroundColor(.black)
-                                .padding(.horizontal, 9)
-                                .padding(.vertical, 4.5)
-                                .background(Color(red: 0.11, green: 0.84, blue: 0.38))
-                                .clipShape(Capsule())
+                            HStack(spacing: 3) {
+                                Image(systemName: "lock.shield.fill")
+                                    .font(.system(size: 8.5))
+                                Text("Yetki Ver & Kaydet")
+                                    .font(.system(size: 9.5, weight: .bold, design: .rounded))
+                            }
+                            .foregroundColor(.black)
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 4.5)
+                            .background(Color(red: 0.11, green: 0.84, blue: 0.38))
+                            .clipShape(Capsule())
                         }
                         .buttonStyle(.plain)
                         
@@ -1188,6 +1320,7 @@ public struct IslandView: View {
                 }
                 .padding(.horizontal, 10)
                 .padding(.vertical, 6)
+                .frame(maxWidth: .infinity, minHeight: 46)
                 .background(Color.white.opacity(0.06))
                 .clipShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
                 .overlay(
@@ -1195,30 +1328,47 @@ public struct IslandView: View {
                         .stroke(keychain.hasSavedPassword ? Color.green.opacity(0.25) : Color.orange.opacity(0.20), lineWidth: 1)
                 )
             }
+            .frame(maxWidth: .infinity)
             
-            // Row 3: Sensitivity Slider Card
-            HStack(spacing: 12) {
+            // Row 3: Custom Luxury Sensitivity Slider Card (Full Width)
+            HStack(spacing: 10) {
                 Image(systemName: "slider.horizontal.3")
-                    .font(.system(size: 11))
+                    .font(.system(size: 11, weight: .bold))
                     .foregroundColor(.cyan)
                 
                 Text("Eşleşme Hassasiyeti")
                     .font(.system(size: 11, weight: .medium, design: .rounded))
-                    .foregroundColor(.white.opacity(0.85))
+                    .foregroundColor(.white.opacity(0.88))
+                    .frame(width: 120, alignment: .leading)
                 
-                Slider(value: $settings.faceIDThreshold, in: 0.60...0.95, step: 0.02)
-                    .accentColor(.cyan)
+                // Custom Gradient Glassmorphic Slider
+                CustomSensitivitySlider(value: $settings.faceIDThreshold)
+                    .frame(maxWidth: .infinity)
                 
-                Text("%\(Int(settings.faceIDThreshold * 100))")
-                    .font(.system(size: 11, weight: .bold, design: .monospaced))
-                    .foregroundColor(.cyan)
-                    .frame(width: 36, alignment: .trailing)
+                HStack(spacing: 2) {
+                    Text("%\(Int(settings.faceIDThreshold * 100))")
+                        .font(.system(size: 11, weight: .bold, design: .monospaced))
+                        .foregroundColor(.cyan)
+                    
+                    if abs(settings.faceIDThreshold - 0.78) < 0.01 {
+                        Text("(İdeal)")
+                            .font(.system(size: 8.5, weight: .semibold, design: .rounded))
+                            .foregroundColor(.green)
+                    }
+                }
+                .frame(width: 55, alignment: .trailing)
             }
             .padding(.horizontal, 12)
-            .padding(.vertical, 5)
+            .padding(.vertical, 6)
+            .frame(maxWidth: .infinity)
             .background(Color.white.opacity(0.05))
             .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .stroke(Color.white.opacity(0.08), lineWidth: 1)
+            )
         }
+        .frame(maxWidth: .infinity)
     }
     
     // MARK: - Permissions In-Island Panel
@@ -1378,5 +1528,59 @@ public struct IslandView: View {
         withAnimation(.spring(response: 0.25, dampingFraction: 0.7)) {
             passwordSaveStatus = "Kaydedildi"
         }
+    }
+}
+
+// MARK: - Custom Glassmorphic Gradient Sensitivity Slider
+public struct CustomSensitivitySlider: View {
+    @Binding var value: Double
+    private let range: ClosedRange<Double> = 0.60...0.95
+    
+    public init(value: Binding<Double>) {
+        self._value = value
+    }
+    
+    public var body: some View {
+        GeometryReader { geo in
+            let width = geo.size.width
+            let fraction = CGFloat(max(0.0, min(1.0, (value - range.lowerBound) / (range.upperBound - range.lowerBound))))
+            
+            ZStack(alignment: .leading) {
+                // Background Track
+                Capsule()
+                    .fill(Color.white.opacity(0.12))
+                    .frame(height: 6)
+                
+                // Active Gradient Track
+                Capsule()
+                    .fill(
+                        LinearGradient(
+                            colors: [Color.blue, Color.cyan, Color(red: 0.11, green: 0.84, blue: 0.38)],
+                            startPoint: .leading,
+                            endPoint: .trailing
+                        )
+                    )
+                    .frame(width: max(6, width * fraction), height: 6)
+                
+                // Custom Glowing Thumb Knob
+                Circle()
+                    .fill(Color.white)
+                    .frame(width: 15, height: 15)
+                    .overlay(Circle().stroke(Color.cyan, lineWidth: 2))
+                    .shadow(color: Color.cyan.opacity(0.7), radius: 4)
+                    .offset(x: max(0, min(width - 15, width * fraction - 7.5)))
+            }
+            .frame(height: 18)
+            .contentShape(Rectangle())
+            .gesture(
+                DragGesture(minimumDistance: 0)
+                    .onChanged { gesture in
+                        let newFraction = max(0.0, min(1.0, gesture.location.x / width))
+                        let newValue = range.lowerBound + Double(newFraction) * (range.upperBound - range.lowerBound)
+                        value = (newValue * 100).rounded() / 100.0
+                    }
+            )
+        }
+        .frame(height: 18)
     }
 }

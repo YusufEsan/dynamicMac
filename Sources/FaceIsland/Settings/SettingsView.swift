@@ -280,13 +280,17 @@ public struct SettingsView: View {
     // MARK: - Dynamic Island Tab
     private var islandSettingsView: some View {
         Form {
-            Section("Display Style") {
-                Toggle("Force Floating Capsule (Bypass Hardware Notch)", isOn: $settings.forceFloatingCapsule)
+            Section("Ada Görünüm Seçeneği") {
+                Picker("Stil", selection: $settings.forceFloatingCapsule) {
+                    Text("🏝️ Çentik Adası (Üste Yapışık)").tag(false)
+                    Text("✨ Yüzen Kapsül (Ayrı / Taşınabilir)").tag(true)
+                }
+                .pickerStyle(.radioGroup)
                 
                 HStack {
-                    Text("Hardware Notch Detected")
+                    Text("Donanım Çentiği Algılandı")
                     Spacer()
-                    Text(ScreenUtils.shared.hasNotch ? "Yes (MacBook Notch)" : "No (External/Legacy)")
+                    Text(ScreenUtils.shared.hasNotch ? "Evet (MacBook Çentiği)" : "Hayır (Harici Monitör/Klasik)")
                         .foregroundColor(ScreenUtils.shared.hasNotch ? .green : .secondary)
                 }
             }

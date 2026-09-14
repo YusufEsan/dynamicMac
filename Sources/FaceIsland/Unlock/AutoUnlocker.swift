@@ -42,8 +42,7 @@ public final class AutoUnlocker {
     
     public func prepareIslandForLockOrWake() {
         DispatchQueue.main.async {
-            IslandWindowController.shared.show()
-            FloatingCapsuleController.shared.show()
+            SettingsManager.shared.applyIslandDisplayMode()
         }
     }
     
