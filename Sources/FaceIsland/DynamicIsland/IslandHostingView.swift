@@ -29,7 +29,7 @@ public final class IslandHostingView<Content: View>: NSHostingView<Content> {
     public override func hitTest(_ point: NSPoint) -> NSView? {
         let localPoint = self.convert(point, from: nil)
         
-        let isVideoActive = SettingsManager.shared.enableNotchVideoPlayer && (NowPlayingManager.shared.isYouTube || !NowPlayingManager.shared.lastActiveUrl.isEmpty)
+        let isVideoActive = SettingsManager.shared.enableNotchVideoPlayer && NowPlayingManager.shared.isPlaying && (NowPlayingManager.shared.isYouTube || (!NowPlayingManager.shared.lastActiveUrl.isEmpty && NowPlayingManager.shared.activePlayerName == "Chrome"))
         let provider = IslandContentProvider.shared
         var isExp = isVideoActive
         if case .expanded = provider.expansionState { isExp = true }

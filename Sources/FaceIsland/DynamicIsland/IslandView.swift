@@ -604,10 +604,11 @@ public struct IslandView: View {
                 .buttonStyle(.plain)
                 .help("Ayarlar")
             }
-            .padding(.horizontal, 24)
+            .padding(.horizontal, 22)
             .padding(.top, isTopAttached ? 10 : 8)
+            .padding(.bottom, 6)
             
-            // Video Screen with rounded corners
+            // Video Screen with rounded corners (enlarged vertically)
             ZStack {
                 RoundedRectangle(cornerRadius: 12, style: .continuous)
                     .fill(Color.black)
@@ -618,114 +619,94 @@ public struct IslandView: View {
                 )
                 .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
             }
-            .frame(height: 190)
+            .frame(height: 240)
             .padding(.horizontal, 22)
             
-            // Bottom Controls Bar: Timeline Scrubber & Playback Controls
-            VStack(spacing: 10) {
-                // Wide Scrubber Timeline Bar
-                HStack(spacing: 12) {
-                    Text(music.formattedPosition)
-                        .font(.system(size: 10, weight: .medium, design: .monospaced))
-                        .foregroundColor(.white.opacity(0.75))
-                        .fixedSize(horizontal: true, vertical: false)
-                    
-                    GeometryReader { geo in
-                        let total = max(1.0, music.duration)
-                        let progress = min(1.0, max(0.0, music.currentPosition / total))
-                        
-                        ZStack(alignment: .leading) {
-                            Capsule()
-                                .fill(Color.white.opacity(0.18))
-                                .frame(height: 4)
-                            
-                            Capsule()
-                                .fill(
-                                    LinearGradient(
-                                        colors: [
-                                            Color.red,
-                                            Color.orange
-                                        ],
-                                        startPoint: .leading,
-                                        endPoint: .trailing
-                                    )
-                                )
-                                .frame(width: max(4, geo.size.width * CGFloat(progress)), height: 4)
-                            
-                            Circle()
-                                .fill(Color.white)
-                                .frame(width: 9.5, height: 9.5)
-                                .shadow(color: Color.red.opacity(0.9), radius: 3)
-                                .offset(x: max(0, min(geo.size.width - 9.5, geo.size.width * CGFloat(progress) - 4.75)))
-                        }
-                        .frame(height: 12)
-                        .contentShape(Rectangle())
-                        .gesture(
-                            DragGesture(minimumDistance: 0)
-                                .onChanged { value in
-                                    let ratio = max(0, min(1, value.location.x / geo.size.width))
-                                    let newPos = ratio * total
-                                    music.seek(to: newPos)
-                                }
-                        )
+            // Bottom Controls Bar: [10s Geri] [Durdur/Başlat] [10s İleri] [Slider] [Zaman]
+            HStack(spacing: 12) {
+                // 1. 10 sn Geri
+                Button(action: {
+                    withAnimation(AnimationConstants.quickInteractive) {
+                        music.skipBackward10()
                     }
-                    .frame(height: 12)
-                    
-                    Text(music.formattedDuration)
-                        .font(.system(size: 10, weight: .medium, design: .monospaced))
-                        .foregroundColor(.white.opacity(0.55))
-                        .fixedSize(horizontal: true, vertical: false)
+                }) {
+                    Image(systemName: "gobackward.10")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundColor(.white.opacity(0.90))
                 }
+                .buttonStyle(.plain)
+                .help("10 sn Geri")
                 
-                // Playback Buttons: Geri Sar (10s) - Durdur/Başlat - İleri Sar (10s)
-                HStack(spacing: 36) {
-                    // Geri Sar (10 sn)
-                    Button(action: {
-                        withAnimation(AnimationConstants.quickInteractive) {
-                            music.skipBackward10()
-                        }
-                    }) {
-                        Image(systemName: "gobackward.10")
-                            .font(.system(size: 13.5, weight: .semibold))
-                            .foregroundColor(.white.opacity(0.85))
+                // 2. Durdur / Başlat
+                Button(action: {
+                    withAnimation(AnimationConstants.quickInteractive) {
+                        music.togglePlayPause()
                     }
-                    .buttonStyle(.plain)
-                    .help("10 sn Geri")
-                    
-                    // Oynat / Duraklat
-                    Button(action: {
-                        withAnimation(AnimationConstants.quickInteractive) {
-                            music.togglePlayPause()
-                        }
-                    }) {
-                        Image(systemName: music.isPlaying ? "pause.fill" : "play.fill")
-                            .font(.system(size: 13.5, weight: .bold))
-                            .foregroundColor(.white)
-                            .padding(7.5)
-                            .background(.ultraThinMaterial)
-                            .background(Color.white.opacity(0.18))
-                            .clipShape(Circle())
-                    }
-                    .buttonStyle(.plain)
-                    
-                    // İleri Sar (10 sn)
-                    Button(action: {
-                        withAnimation(AnimationConstants.quickInteractive) {
-                            music.skipForward10()
-                        }
-                    }) {
-                        Image(systemName: "goforward.10")
-                            .font(.system(size: 13.5, weight: .semibold))
-                            .foregroundColor(.white.opacity(0.85))
-                    }
-                    .buttonStyle(.plain)
-                    .help("10 sn İleri")
+                }) {
+                    Image(systemName: music.isPlaying ? "pause.fill" : "play.fill")
+                        .font(.system(size: 13, weight: .bold))
+                        .foregroundColor(.white)
+                        .padding(6)
+                        .background(Color.white.opacity(0.12))
+                        .clipShape(Circle())
                 }
-                .padding(.top, 4)
+                .buttonStyle(.plain)
+                
+                // 3. 10 sn İleri
+                Button(action: {
+                    withAnimation(AnimationConstants.quickInteractive) {
+                        music.skipForward10()
+                    }
+                }) {
+                    Image(systemName: "goforward.10")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundColor(.white.opacity(0.90))
+                }
+                .buttonStyle(.plain)
+                .help("10 sn İleri")
+                
+                // 4. Pure Red Scrubber Slider Bar
+                GeometryReader { geo in
+                    let total = max(1.0, music.duration)
+                    let progress = min(1.0, max(0.0, music.currentPosition / total))
+                    
+                    ZStack(alignment: .leading) {
+                        Capsule()
+                            .fill(Color.white.opacity(0.18))
+                            .frame(height: 4)
+                        
+                        Capsule()
+                            .fill(Color.red)
+                            .frame(width: max(4, geo.size.width * CGFloat(progress)), height: 4)
+                        
+                        Circle()
+                            .fill(Color.white)
+                            .frame(width: 9.5, height: 9.5)
+                            .shadow(color: Color.red.opacity(0.8), radius: 3)
+                            .offset(x: max(0, min(geo.size.width - 9.5, geo.size.width * CGFloat(progress) - 4.75)))
+                    }
+                    .frame(height: 14)
+                    .contentShape(Rectangle())
+                    .gesture(
+                        DragGesture(minimumDistance: 0)
+                            .onChanged { value in
+                                let ratio = max(0, min(1, value.location.x / geo.size.width))
+                                let newPos = ratio * total
+                                music.seek(to: newPos)
+                            }
+                    )
+                }
+                .frame(height: 14)
+                
+                // 5. Zaman (0:17 / 3:41)
+                Text("\(music.formattedPosition) / \(music.formattedDuration)")
+                    .font(.system(size: 11, weight: .semibold, design: .monospaced))
+                    .foregroundColor(.white.opacity(0.85))
+                    .fixedSize(horizontal: true, vertical: false)
             }
-            .padding(.horizontal, 24)
-            .padding(.top, 14)
-            .padding(.bottom, 16)
+            .padding(.horizontal, 22)
+            .padding(.top, 8)
+            .padding(.bottom, 12)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
@@ -1041,7 +1022,7 @@ public struct IslandView: View {
     }
     
     private var isVideoPlayerActive: Bool {
-        settings.enableNotchVideoPlayer && (music.isYouTube || !music.lastActiveUrl.isEmpty) && !isShowingSettingsInVideoMode
+        settings.enableNotchVideoPlayer && music.isPlaying && (music.isYouTube || (!music.lastActiveUrl.isEmpty && music.activePlayerName == "Chrome")) && !isShowingSettingsInVideoMode
     }
     
     private var isExpanded: Bool {
