@@ -40,6 +40,8 @@ public final class IslandContentProvider {
     public var activeModule: IslandModuleType = .faceID
     public var isHovered: Bool = false
     public var isPinnedExpanded: Bool = false
+    public var currentVisualWidth: CGFloat = 320
+    public var currentVisualHeight: CGFloat = 35
     
     public var onStateChanged: ((IslandExpansionState) -> Void)?
     

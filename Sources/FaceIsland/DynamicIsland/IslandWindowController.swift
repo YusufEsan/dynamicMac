@@ -15,6 +15,8 @@ public final class IslandWindowController {
     public static let shared = IslandWindowController()
     
     private var globalClickMonitor: Any?
+    private var mouseMoveMonitor: Any?
+    private var localMouseMoveMonitor: Any?
     
     public var window: IslandPanel?
     
@@ -28,20 +30,58 @@ public final class IslandWindowController {
                 IslandWindowController.handleScreenClick()
             }
         }
+        if mouseMoveMonitor == nil {
+            mouseMoveMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.mouseMoved]) { [weak self] _ in
+                self?.updateMousePassthrough()
+            }
+        }
+        if localMouseMoveMonitor == nil {
+            localMouseMoveMonitor = NSEvent.addLocalMonitorForEvents(matching: [.mouseMoved]) { [weak self] event in
+                self?.updateMousePassthrough()
+                return event
+            }
+        }
+    }
+    
+    public func updateMousePassthrough() {
+        guard let window = self.window, window.isVisible, !SettingsManager.shared.forceFloatingCapsule else { return }
+        let mouseLoc = NSEvent.mouseLocation
+        let windowFrame = window.frame
+        
+        let provider = IslandContentProvider.shared
+        let activeWidth: CGFloat = provider.currentVisualWidth
+        let activeHeight: CGFloat = provider.currentVisualHeight
+        
+        let activeRect = CGRect(
+            x: windowFrame.origin.x + (windowFrame.width - activeWidth) / 2.0,
+            y: windowFrame.maxY - activeHeight,
+            width: activeWidth,
+            height: activeHeight
+        )
+        
+        let isInside = activeRect.insetBy(dx: -4, dy: -4).contains(mouseLoc)
+        
+        if isInside {
+            if window.ignoresMouseEvents {
+                window.ignoresMouseEvents = false
+            }
+        } else {
+            if !window.ignoresMouseEvents {
+                window.ignoresMouseEvents = true
+            }
+        }
     }
     
     @discardableResult
     public static func handleScreenClick() -> Bool {
         guard let window = IslandWindowController.shared.window, window.isVisible, !SettingsManager.shared.forceFloatingCapsule else { return false }
         let mouseLoc = NSEvent.mouseLocation
-        guard let screen = window.screen ?? NSScreen.main ?? NSScreen.screens.first else { return false }
-        let screenFrame = screen.frame
         
         let provider = IslandContentProvider.shared
         if case .expanded = provider.expansionState {
             let windowFrame = window.frame
-            let expandedWidth: CGFloat = 780
-            let expandedHeight: CGFloat = 380
+            let expandedWidth: CGFloat = provider.currentVisualWidth
+            let expandedHeight: CGFloat = provider.currentVisualHeight
             let expandedRect = CGRect(
                 x: windowFrame.origin.x + (windowFrame.width - expandedWidth) / 2.0,
                 y: windowFrame.maxY - expandedHeight,

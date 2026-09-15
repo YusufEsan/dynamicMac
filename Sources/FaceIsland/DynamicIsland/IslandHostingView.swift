@@ -29,13 +29,9 @@ public final class IslandHostingView<Content: View>: NSHostingView<Content> {
     public override func hitTest(_ point: NSPoint) -> NSView? {
         let localPoint = self.convert(point, from: nil)
         
-        let isVideoActive = SettingsManager.shared.enableNotchVideoPlayer && NowPlayingManager.shared.isPlaying && (NowPlayingManager.shared.isYouTube || (!NowPlayingManager.shared.lastActiveUrl.isEmpty && NowPlayingManager.shared.activePlayerName == "Chrome"))
         let provider = IslandContentProvider.shared
-        var isExp = isVideoActive
-        if case .expanded = provider.expansionState { isExp = true }
-        
-        let width: CGFloat = isExp ? 780 : 380
-        let height: CGFloat = isExp ? 380 : 44
+        let width: CGFloat = provider.currentVisualWidth
+        let height: CGFloat = provider.currentVisualHeight
         let yOffset: CGFloat = isTopAttached ? 0 : 8
         let rectX: CGFloat = (bounds.width - width) / 2.0
         
@@ -49,8 +45,7 @@ public final class IslandHostingView<Content: View>: NSHostingView<Content> {
         let isInside = islandRect.contains(localPoint)
         
         if isInside {
-            let res = super.hitTest(point) ?? self
-            return res
+            return super.hitTest(point) ?? self
         }
         
         // Point is outside the visible island -> pass click directly to underlying windows/menu bar!
@@ -61,3 +56,4 @@ public final class IslandHostingView<Content: View>: NSHostingView<Content> {
         super.mouseDown(with: event)
     }
 }
+

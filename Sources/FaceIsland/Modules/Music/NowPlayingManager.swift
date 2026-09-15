@@ -189,8 +189,13 @@ public final class NowPlayingManager {
                         detectedApp = "Chrome"
                     }
                     
+                    // If MediaRemote reports Spotify/Music/Chrome as PAUSED, immediately check if Chrome has an active video playing!
+                    if !isMediaPlaying && self.isAppRunning("com.google.Chrome") {
+                        self.fetchChromeMediaState(mediaRemotePlaying: false)
+                        return
+                    }
+                    
                     if (detectedApp == "Chrome" || detectedApp == "YouTube") && !isMediaPlaying {
-                        // Browser video is paused/closed: verify actual tab media rather than stale cache
                         self.fetchChromeMediaState(mediaRemotePlaying: false)
                         return
                     }
@@ -240,17 +245,21 @@ public final class NowPlayingManager {
         else if isAppRunning("com.google.Chrome") {
             fetchChromeMediaState(mediaRemotePlaying: false)
         } else {
-            DispatchQueue.main.async { [weak self] in
-                if self?.isPlaying == true {
-                    self?.isPlaying = false
-                    self?.title = "Müzik Çalmıyor"
-                    self?.artist = ""
-                    self?.artwork = nil
-                    self?.duration = 0
-                    self?.basePosition = 0
-                    self?.playbackRate = 0
-                    self?.dominantColor = Color.pink
-                }
+            resetToStopped()
+        }
+    }
+    
+    private func resetToStopped() {
+        DispatchQueue.main.async { [weak self] in
+            if self?.isPlaying == true {
+                self?.isPlaying = false
+                self?.title = "Müzik Çalmıyor"
+                self?.artist = ""
+                self?.artwork = nil
+                self?.duration = 0
+                self?.basePosition = 0
+                self?.playbackRate = 0
+                self?.dominantColor = Color.pink
             }
         }
     }
@@ -279,8 +288,23 @@ public final class NowPlayingManager {
                         if vStats is not "" then
                             return "stats|||" & curTitle & "|||" & curUrl & "|||" & vStats
                         end if
-                        return "info|||" & curTitle & "|||" & curUrl
                     end if
+                end try
+                -- 2. Check active video in any media tab
+                try
+                    repeat with w in windows
+                        repeat with t in tabs of w
+                            try
+                                set u to URL of t
+                                if u contains "youtube.com/watch" or u contains "youtube.com/shorts" or u contains "twitch.tv" or u contains "spotify.com" or u contains "soundcloud.com" or u contains "netflix.com" or u contains "myasian" then
+                                    set vStats to execute t javascript "\(jsCode)"
+                                    if vStats is not "" and vStats ends with "1" then
+                                        return "stats|||" & (title of t) & "|||" & u & "|||" & vStats
+                                    end if
+                                end if
+                            end try
+                        end repeat
+                    end repeat
                 end try
             end if
             return "stopped"
@@ -547,7 +571,11 @@ public final class NowPlayingManager {
                     
                     self.fetchArtworkIfNeeded(title: newTitle, artist: newArtist)
                 } else {
-                    self.isPlaying = false
+                    if self.isAppRunning("com.google.Chrome") {
+                        self.fetchChromeMediaState(mediaRemotePlaying: false)
+                    } else {
+                        self.isPlaying = false
+                    }
                 }
             }
         }
@@ -602,7 +630,13 @@ public final class NowPlayingManager {
                         self.fetchArtworkIfNeeded(title: newTitle, artist: newArtist)
                     }
                 } else {
-                    self.isPlaying = false
+                    if self.isAppRunning("com.google.Chrome") {
+                        self.fetchChromeMediaState(mediaRemotePlaying: false)
+                    } else if self.isAppRunning("com.apple.Music") {
+                        self.fetchAppleMusicState()
+                    } else {
+                        self.isPlaying = false
+                    }
                 }
             }
         }

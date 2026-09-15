@@ -19,6 +19,24 @@ public struct ClipboardModuleView: View {
         return list
     }
     
+    private var gridColumns: [GridItem] {
+        let count = displayedItems.count
+        if count <= 1 {
+            return [GridItem(.flexible())]
+        } else if count == 2 {
+            return [GridItem(.flexible(), spacing: 8), GridItem(.flexible(), spacing: 8)]
+        } else if count == 3 {
+            return [GridItem(.flexible(), spacing: 8), GridItem(.flexible(), spacing: 8), GridItem(.flexible(), spacing: 8)]
+        } else {
+            return [
+                GridItem(.flexible(), spacing: 8),
+                GridItem(.flexible(), spacing: 8),
+                GridItem(.flexible(), spacing: 8),
+                GridItem(.flexible(), spacing: 8)
+            ]
+        }
+    }
+    
     public var body: some View {
         VStack(spacing: 8) {
             // Header Row: Filter Pills + Search + Clear All
@@ -40,7 +58,7 @@ public struct ClipboardModuleView: View {
                 
                 Spacer()
                 
-                // Large Search Input
+                // Search Input
                 HStack(spacing: 6) {
                     Image(systemName: "magnifyingglass")
                         .font(.system(size: 11))
@@ -50,7 +68,7 @@ public struct ClipboardModuleView: View {
                         .textFieldStyle(.plain)
                         .font(.system(size: 11.5, weight: .medium, design: .rounded))
                         .foregroundColor(.white)
-                        .frame(width: 160)
+                        .frame(width: displayedItems.count <= 1 ? 120 : 150)
                     
                     if !searchText.isEmpty {
                         Button(action: { searchText = "" }) {
@@ -91,12 +109,7 @@ public struct ClipboardModuleView: View {
                 emptyStateView
             } else {
                 ScrollView(.vertical, showsIndicators: displayedItems.count > 8) {
-                    LazyVGrid(columns: [
-                        GridItem(.flexible(), spacing: 8),
-                        GridItem(.flexible(), spacing: 8),
-                        GridItem(.flexible(), spacing: 8),
-                        GridItem(.flexible(), spacing: 8)
-                    ], spacing: 8) {
+                    LazyVGrid(columns: gridColumns, spacing: 8) {
                         ForEach(displayedItems.prefix(40)) { item in
                             clipboardCard(item: item)
                         }
@@ -104,7 +117,7 @@ public struct ClipboardModuleView: View {
                     .padding(.horizontal, 2)
                     .padding(.vertical, 2)
                 }
-                .frame(height: displayedItems.count <= 4 ? 70 : 148)
+                .frame(height: displayedItems.count <= 4 ? 74 : 154)
             }
         }
     }

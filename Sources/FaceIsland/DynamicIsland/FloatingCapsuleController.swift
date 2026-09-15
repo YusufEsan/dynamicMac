@@ -5,6 +5,8 @@ public final class FloatingCapsuleController {
     public static let shared = FloatingCapsuleController()
     
     private var globalClickMonitor: Any?
+    private var mouseMoveMonitor: Any?
+    private var localMouseMoveMonitor: Any?
     
     public var window: IslandPanel?
     
@@ -18,6 +20,47 @@ public final class FloatingCapsuleController {
                 FloatingCapsuleController.handleScreenClick()
             }
         }
+        if mouseMoveMonitor == nil {
+            mouseMoveMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.mouseMoved]) { [weak self] _ in
+                self?.updateMousePassthrough()
+            }
+        }
+        if localMouseMoveMonitor == nil {
+            localMouseMoveMonitor = NSEvent.addLocalMonitorForEvents(matching: [.mouseMoved]) { [weak self] event in
+                self?.updateMousePassthrough()
+                return event
+            }
+        }
+    }
+    
+    public func updateMousePassthrough() {
+        guard let window = self.window, window.isVisible, SettingsManager.shared.forceFloatingCapsule else { return }
+        let mouseLoc = NSEvent.mouseLocation
+        let windowFrame = window.frame
+        
+        let provider = IslandContentProvider.shared
+        let activeWidth: CGFloat = provider.currentVisualWidth
+        let activeHeight: CGFloat = provider.currentVisualHeight
+        let topOffset: CGFloat = 8
+        
+        let activeRect = CGRect(
+            x: windowFrame.origin.x + (windowFrame.width - activeWidth) / 2.0,
+            y: windowFrame.maxY - activeHeight - topOffset,
+            width: activeWidth,
+            height: activeHeight
+        )
+        
+        let isInside = activeRect.insetBy(dx: -4, dy: -4).contains(mouseLoc)
+        
+        if isInside {
+            if window.ignoresMouseEvents {
+                window.ignoresMouseEvents = false
+            }
+        } else {
+            if !window.ignoresMouseEvents {
+                window.ignoresMouseEvents = true
+            }
+        }
     }
     
     @discardableResult
@@ -28,11 +71,11 @@ public final class FloatingCapsuleController {
         let provider = IslandContentProvider.shared
         
         if case .expanded = provider.expansionState {
-            let width: CGFloat = 780
-            let height: CGFloat = 300
+            let width: CGFloat = provider.currentVisualWidth
+            let height: CGFloat = provider.currentVisualHeight
             let expandedRect = CGRect(
                 x: windowFrame.midX - (width / 2.0),
-                y: windowFrame.maxY - height,
+                y: windowFrame.maxY - height - 8,
                 width: width,
                 height: height
             )

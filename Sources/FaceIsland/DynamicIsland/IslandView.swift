@@ -133,12 +133,25 @@ public struct IslandView: View {
         .onAppear {
             startLiveEqualizer()
             startRadarAnimation()
+            updateVisualDimensions()
         }
-        .onChange(of: provider.expansionState) { state in
-            if case .compact = state {
+        .onChange(of: provider.expansionState) { _ in
+            if case .compact = provider.expansionState {
                 isShowingSettingsInVideoMode = false
             }
+            updateVisualDimensions()
         }
+        .onChange(of: activeTopTab) { _ in
+            updateVisualDimensions()
+        }
+        .onChange(of: isVideoPlayerActive) { _ in
+            updateVisualDimensions()
+        }
+    }
+    
+    private func updateVisualDimensions() {
+        IslandContentProvider.shared.currentVisualWidth = islandWidth
+        IslandContentProvider.shared.currentVisualHeight = islandHeight
     }
     
     private var formattedUserName: String {
@@ -545,15 +558,15 @@ public struct IslandView: View {
                     // Tray Tab View (Pano Geçmişi)
                     ClipboardModuleView()
                         .padding(.horizontal, 28)
-                        .padding(.bottom, 10)
-                        .frame(height: 186)
+                        .padding(.bottom, 12)
+                        .frame(height: tabContentHeight)
                         .transition(.opacity)
                 } else if activeTopTab == "Audio" {
                     // Per-App Audio Mixer Module
                     AudioMixerModuleView()
                         .padding(.horizontal, 28)
                         .padding(.bottom, 10)
-                        .frame(height: 180)
+                        .frame(height: tabContentHeight)
                         .transition(.opacity)
                 } else if activeTopTab == "Settings" {
                     // In-Island Permissions & Settings View
@@ -753,9 +766,9 @@ public struct IslandView: View {
                 // Official Badge
                 ZStack {
                     RoundedRectangle(cornerRadius: 5, style: .continuous)
-                        .fill(music.isSpotify ? Color(red: 0.11, green: 0.84, blue: 0.38) : (music.isYouTube ? Color.red : Color(red: 0.11, green: 0.84, blue: 0.38)))
+                        .fill(equalizerColor)
                         .frame(width: 18, height: 18)
-                        .shadow(color: (music.isSpotify ? Color(red: 0.11, green: 0.84, blue: 0.38) : Color.red).opacity(0.55), radius: 3, x: 0, y: 1)
+                        .shadow(color: equalizerColor.opacity(0.55), radius: 3, x: 0, y: 1)
                     
                     if music.isSpotify {
                         SpotifyLogoShape(size: 11.5, iconColor: .black)
@@ -981,17 +994,21 @@ public struct IslandView: View {
     }
     
     // MARK: - Helper Views for Equalizer
+    private var equalizerColor: Color {
+        if music.isSpotify {
+            return Color(red: 0.11, green: 0.84, blue: 0.38)
+        } else if music.isYouTube {
+            return Color(red: 1.0, green: 0.15, blue: 0.15)
+        } else {
+            return Color(red: 0.98, green: 0.18, blue: 0.38)
+        }
+    }
+    
     private func animatedEqualizer(barCount: Int, height: CGFloat) -> some View {
         HStack(spacing: 2.5) {
             ForEach(0..<barCount, id: \.self) { i in
                 RoundedRectangle(cornerRadius: 1.5)
-                    .fill(
-                        LinearGradient(
-                            colors: music.isSpotify ? [Color(red: 0.11, green: 0.84, blue: 0.38), Color.mint, Color.cyan] : [Color.pink, Color.purple, Color.cyan],
-                            startPoint: .bottom,
-                            endPoint: .top
-                        )
-                    )
+                    .fill(equalizerColor)
                     .frame(
                         width: 2.5,
                         height: max(3, height * (i < equalizerBars.count ? equalizerBars[i] : 0.5))
@@ -1032,6 +1049,19 @@ public struct IslandView: View {
         return false
     }
     
+    private var trayWidth: CGFloat {
+        let count = ClipboardManager.shared.items.count
+        if count <= 1 {
+            return 540
+        } else if count == 2 {
+            return 590
+        } else if count == 3 {
+            return 650
+        } else {
+            return 720
+        }
+    }
+    
     private var islandWidth: CGFloat {
         if isVideoPlayerActive {
             return 510
@@ -1052,7 +1082,7 @@ public struct IslandView: View {
         case "Calendar":
             return 570
         case "Tray":
-            return 740
+            return trayWidth
         case "Audio":
             return 620
         case "Settings":
@@ -1065,11 +1095,11 @@ public struct IslandView: View {
     private var trayContentHeight: CGFloat {
         let count = ClipboardManager.shared.items.count
         if count == 0 {
-            return 112
+            return 124
         } else if count <= 4 {
-            return 112
+            return 124
         } else {
-            return 190
+            return 204
         }
     }
     
@@ -1445,11 +1475,18 @@ public struct IslandView: View {
                     
                     Spacer()
                     
-                    Toggle("", isOn: Binding(get: { settings.enableNotchVideoPlayer }, set: { settings.enableNotchVideoPlayer = $0 }))
-                        .toggleStyle(.switch)
-                        .labelsHidden()
-                        .tint(Color(red: 0.11, green: 0.84, blue: 0.38))
-                        .scaleEffect(0.8)
+                    ZStack(alignment: settings.enableNotchVideoPlayer ? .trailing : .leading) {
+                        Capsule()
+                            .fill(settings.enableNotchVideoPlayer ? Color(red: 0.11, green: 0.84, blue: 0.38) : Color.white.opacity(0.18))
+                            .frame(width: 32, height: 18)
+                            .shadow(color: settings.enableNotchVideoPlayer ? Color.green.opacity(0.4) : Color.clear, radius: 2)
+                        
+                        Circle()
+                            .fill(Color.white)
+                            .frame(width: 14, height: 14)
+                            .padding(2)
+                    }
+                    .animation(.spring(response: 0.25, dampingFraction: 0.7), value: settings.enableNotchVideoPlayer)
                 }
                 .padding(10)
                 .background(settings.enableNotchVideoPlayer ? Color.green.opacity(0.12) : Color.white.opacity(0.04))

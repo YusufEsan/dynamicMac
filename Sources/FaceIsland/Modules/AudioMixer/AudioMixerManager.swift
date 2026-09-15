@@ -11,7 +11,7 @@ public struct AudioAppInfo: Identifiable, Equatable {
     public var volume: Double
     public var isMuted: Bool
     
-    public init(id: String, bundleId: String, name: String, icon: String, iconColor: Color, volume: Double = 80.0, isMuted: Bool = false) {
+    public init(id: String, bundleId: String, name: String, icon: String, iconColor: Color, volume: Double = 100.0, isMuted: Bool = false) {
         self.id = id
         self.bundleId = bundleId
         self.name = name
@@ -77,7 +77,7 @@ public final class AudioMixerManager {
         var detected: [AudioAppInfo] = []
         for app in supportedApps {
             if isAppRunning(app.bundleId) {
-                let savedVol = volumeStore[app.id] ?? 80.0
+                let savedVol = volumeStore[app.id] ?? 100.0
                 let savedMute = muteStore[app.id] ?? false
                 detected.append(AudioAppInfo(
                     id: app.id,
@@ -210,8 +210,8 @@ public final class AudioMixerManager {
         guard let idx = activeApps.firstIndex(where: { $0.id == id }) else { return }
         let isMuted = activeApps[idx].isMuted || activeApps[idx].volume == 0
         if isMuted {
-            let restore = volumeStore[id] ?? 80.0
-            let target = restore > 0 ? restore : 80.0
+            let restore = volumeStore[id] ?? 100.0
+            let target = restore > 0 ? restore : 100.0
             setAppVolume(id: id, volume: target)
         } else {
             volumeStore[id] = activeApps[idx].volume
