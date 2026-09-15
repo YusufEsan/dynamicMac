@@ -10,9 +10,9 @@ public struct AudioMixerModuleView: View {
         VStack(spacing: 8) {
             // Header
             HStack {
-                Image(systemName: "slider.horizontal.3")
+                Image(systemName: "speaker.wave.3.fill")
                     .font(.system(size: 11, weight: .bold))
-                    .foregroundColor(Color.cyan)
+                    .foregroundColor(Color(red: 0.11, green: 0.84, blue: 0.38))
                 
                 Text("Uygulama Ses Mikseri")
                     .font(.system(size: 12, weight: .bold, design: .rounded))
@@ -20,20 +20,20 @@ public struct AudioMixerModuleView: View {
                 
                 Spacer()
                 
-                Text("Anlık Ayar")
+                Text("\(mixer.activeAppCount) Kaynak")
                     .font(.system(size: 10, weight: .medium))
                     .foregroundColor(.white.opacity(0.45))
             }
             .padding(.horizontal, 4)
             
-            // Sliders Container
-            ScrollView(.vertical, showsIndicators: false) {
-                VStack(spacing: 6) {
-                    // 1. Ana Sistem Sesi (Master Volume)
+            // Sliders Container (Scrollable after 5 rows)
+            ScrollView(.vertical, showsIndicators: mixer.activeAppCount > 5) {
+                VStack(spacing: 7) {
+                    // 1. Ana Sistem Sesi (Master Volume) - Always present
                     volumeRow(
                         title: "Ana Sistem Sesi",
                         icon: mixer.isMasterMuted ? "speaker.slash.fill" : (mixer.masterVolume > 50 ? "speaker.wave.3.fill" : (mixer.masterVolume > 0 ? "speaker.wave.1.fill" : "speaker.fill")),
-                        iconColor: mixer.isMasterMuted ? .red : .blue,
+                        iconColor: mixer.isMasterMuted ? .gray : Color(red: 0.11, green: 0.84, blue: 0.38),
                         value: Binding(
                             get: { mixer.masterVolume },
                             set: { mixer.setMasterVolume($0) }
@@ -43,51 +43,25 @@ public struct AudioMixerModuleView: View {
                         onMuteToggle: { mixer.toggleMasterMute() }
                     )
                     
-                    // 2. Spotify Sesi
-                    if mixer.isSpotifyRunning {
+                    // 2. Dynamically Detected Active Apps
+                    ForEach(mixer.activeApps) { app in
                         volumeRow(
-                            title: "Spotify",
-                            icon: "waveform",
-                            iconColor: Color(red: 0.11, green: 0.84, blue: 0.38),
+                            title: app.name,
+                            icon: app.icon,
+                            iconColor: app.isMuted ? .gray : app.iconColor,
                             value: Binding(
-                                get: { mixer.spotifyVolume },
-                                set: { mixer.setSpotifyVolume($0) }
+                                get: { app.volume },
+                                set: { mixer.setAppVolume(id: app.id, volume: $0) }
                             ),
-                            isActive: true
-                        )
-                    }
-                    
-                    // 3. Chrome / Web Medya Sesi
-                    if mixer.isChromeRunning {
-                        volumeRow(
-                            title: "Google Chrome (Web Medya)",
-                            icon: "play.tv.fill",
-                            iconColor: .red,
-                            value: Binding(
-                                get: { mixer.chromeVolume },
-                                set: { mixer.setChromeVolume($0) }
-                            ),
-                            isActive: true
-                        )
-                    }
-                    
-                    // 4. Apple Music Sesi
-                    if mixer.isMusicRunning {
-                        volumeRow(
-                            title: "Apple Music",
-                            icon: "music.note",
-                            iconColor: .pink,
-                            value: Binding(
-                                get: { mixer.musicVolume },
-                                set: { mixer.setMusicVolume($0) }
-                            ),
-                            isActive: true
+                            isActive: true,
+                            isMuted: app.isMuted || app.volume == 0,
+                            onMuteToggle: { mixer.toggleAppMute(id: app.id) }
                         )
                     }
                 }
                 .padding(.horizontal, 2)
             }
-            .frame(maxHeight: 140)
+            .frame(maxHeight: CGFloat(min(mixer.activeAppCount, 5) * 44))
         }
     }
     
@@ -143,8 +117,13 @@ public struct AudioMixerModuleView: View {
             }
         }
         .padding(.horizontal, 10)
-        .padding(.vertical, 5)
-        .background(Color.white.opacity(0.06))
-        .cornerRadius(8)
+        .padding(.vertical, 5.5)
+        .background(Color.white.opacity(0.05))
+        .clipShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 9, style: .continuous)
+                .stroke(Color.white.opacity(0.08), lineWidth: 1)
+        )
     }
 }
+

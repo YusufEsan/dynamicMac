@@ -287,6 +287,30 @@ public struct SettingsView: View {
                 }
                 .pickerStyle(.radioGroup)
                 
+                // Çentik Konumu (Sol / Orta / Sağ) - Sadece Çentik Adası seçeneği aktifken
+                VStack(alignment: .leading, spacing: 6) {
+                    HStack {
+                        Text("Çentik Konumu (Hizalama)")
+                            .font(.subheadline.bold())
+                        Spacer()
+                        if settings.forceFloatingCapsule {
+                            Text("Sadece Çentik Adasında Aktif")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                    }
+                    
+                    Picker("Konum", selection: $settings.notchAlignment) {
+                        Text("⬅️ Sol").tag(NotchAlignment.left)
+                        Text("⏺️ Orta").tag(NotchAlignment.center)
+                        Text("➡️ Sağ").tag(NotchAlignment.right)
+                    }
+                    .pickerStyle(.segmented)
+                    .disabled(settings.forceFloatingCapsule)
+                    .opacity(settings.forceFloatingCapsule ? 0.45 : 1.0)
+                }
+                .padding(.vertical, 4)
+                
                 HStack {
                     Text("Donanım Çentiği Algılandı")
                     Spacer()

@@ -2,7 +2,7 @@ import SwiftUI
 
 public enum AnimationConstants {
     /// Super liquid bouncy spring for Apple-like Island morphing
-    public static let islandMorphSpring = Animation.interpolatingSpring(mass: 0.65, stiffness: 320, damping: 19, initialVelocity: 6)
+    public static let islandMorphSpring = Animation.interpolatingSpring(mass: 0.7, stiffness: 250, damping: 14.5, initialVelocity: 6)
     
     /// Smooth fluid expansion
     public static let smoothExpansion = Animation.spring(response: 0.32, dampingFraction: 0.68, blendDuration: 0.1)

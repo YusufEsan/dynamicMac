@@ -39,11 +39,12 @@ public final class IslandWindowController {
         
         let provider = IslandContentProvider.shared
         if case .expanded = provider.expansionState {
+            let windowFrame = window.frame
             let expandedWidth: CGFloat = 780
-            let expandedHeight: CGFloat = 300
+            let expandedHeight: CGFloat = 380
             let expandedRect = CGRect(
-                x: screenFrame.midX - (expandedWidth / 2.0),
-                y: screenFrame.maxY - expandedHeight,
+                x: windowFrame.origin.x + (windowFrame.width - expandedWidth) / 2.0,
+                y: windowFrame.maxY - expandedHeight,
                 width: expandedWidth,
                 height: expandedHeight
             )
@@ -104,15 +105,37 @@ public final class IslandWindowController {
         repositionWindow()
     }
     
+    private var slideTimer: Timer?
+    
     @MainActor
-    public func repositionWindow() {
+    public func repositionWindow(animate: Bool = true) {
         guard let window = self.window, let screen = NSScreen.main ?? NSScreen.screens.first else { return }
         let canvasWidth: CGFloat = 780
-        let canvasHeight: CGFloat = 340
+        let canvasHeight: CGFloat = 380
         let screenFrame = screen.frame
-        let x = screenFrame.midX - (canvasWidth / 2.0)
+        
+        let targetX: CGFloat
+        switch SettingsManager.shared.notchAlignment {
+        case .left:
+            targetX = screenFrame.minX + 16
+        case .right:
+            targetX = screenFrame.maxX - canvasWidth - 16
+        case .center:
+            targetX = screenFrame.midX - (canvasWidth / 2.0)
+        }
         let y = screenFrame.maxY - canvasHeight
-        window.setFrame(NSRect(x: x, y: y, width: canvasWidth, height: canvasHeight), display: true)
+        let targetFrame = NSRect(x: targetX, y: y, width: canvasWidth, height: canvasHeight)
+        
+        if animate && window.isVisible && abs(window.frame.origin.x - targetX) > 1.0 {
+            NSAnimationContext.runAnimationGroup { context in
+                context.duration = 0.32
+                context.timingFunction = CAMediaTimingFunction(controlPoints: 0.175, 0.885, 0.32, 1.275)
+                context.allowsImplicitAnimation = true
+                window.animator().setFrame(targetFrame, display: true)
+            }
+        } else {
+            window.setFrame(targetFrame, display: true)
+        }
     }
     
     @objc private func screenParametersChanged() {

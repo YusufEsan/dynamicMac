@@ -424,7 +424,7 @@ public struct IslandView: View {
                             Image(systemName: "tray.full.fill")
                                 .font(.system(size: 10))
                                 .foregroundColor(activeTopTab == "Tray" ? .cyan : .white.opacity(0.6))
-                            Text("Tepsi (Pano)")
+                            Text("Pano")
                                 .font(.system(size: 11, weight: .bold, design: .rounded))
                         }
                         .padding(.horizontal, 10)
@@ -451,9 +451,9 @@ public struct IslandView: View {
                         }
                     }) {
                         HStack(spacing: 4) {
-                            Image(systemName: "slider.vertical.3")
+                            Image(systemName: "speaker.wave.2.fill")
                                 .font(.system(size: 10))
-                                .foregroundColor(activeTopTab == "Audio" ? .purple : .white.opacity(0.6))
+                                .foregroundColor(activeTopTab == "Audio" ? Color(red: 0.11, green: 0.84, blue: 0.38) : .white.opacity(0.6))
                             Text("Ses")
                                 .font(.system(size: 11, weight: .bold, design: .rounded))
                         }
@@ -461,14 +461,14 @@ public struct IslandView: View {
                         .padding(.vertical, 4.5)
                         .background(
                             activeTopTab == "Audio" ?
-                            LinearGradient(colors: [Color.purple.opacity(0.40), Color.indigo.opacity(0.22)], startPoint: .topLeading, endPoint: .bottomTrailing) :
+                            LinearGradient(colors: [Color.green.opacity(0.35), Color.mint.opacity(0.18)], startPoint: .topLeading, endPoint: .bottomTrailing) :
                             LinearGradient(colors: [Color.white.opacity(0.06), Color.white.opacity(0.04)], startPoint: .topLeading, endPoint: .bottomTrailing)
                         )
                         .foregroundColor(activeTopTab == "Audio" ? .white : .white.opacity(0.65))
                         .clipShape(Capsule())
                         .overlay(
                             Capsule()
-                                .stroke(activeTopTab == "Audio" ? Color.purple.opacity(0.55) : Color.clear, lineWidth: 1)
+                                .stroke(activeTopTab == "Audio" ? Color.green.opacity(0.55) : Color.clear, lineWidth: 1)
                         )
                     }
                     .buttonStyle(.plain)
@@ -484,6 +484,7 @@ public struct IslandView: View {
                             isShowingSettingsInVideoMode = false
                         } else {
                             activeTopTab = "Settings"
+                            settingsSubTab = "FaceID"
                             isShowingSettingsInVideoMode = true
                         }
                     }
@@ -589,7 +590,7 @@ public struct IslandView: View {
                     withAnimation(AnimationConstants.quickInteractive) {
                         isShowingSettingsInVideoMode = true
                         activeTopTab = "Settings"
-                        settingsSubTab = "Permissions"
+                        settingsSubTab = "FaceID"
                         provider.expansionState = .expanded(provider.activeModule)
                     }
                 }) {
@@ -1022,7 +1023,7 @@ public struct IslandView: View {
     }
     
     private var isVideoPlayerActive: Bool {
-        settings.enableNotchVideoPlayer && music.isPlaying && (music.isYouTube || (!music.lastActiveUrl.isEmpty && music.activePlayerName == "Chrome")) && !isShowingSettingsInVideoMode
+        settings.enableNotchVideoPlayer && music.isPlaying && (music.isYouTube || (!music.lastActiveUrl.isEmpty && music.activePlayerName == "Chrome")) && (activeTopTab == "Music" || activeTopTab == "Nook") && !isShowingSettingsInVideoMode
     }
     
     private var isExpanded: Bool {
@@ -1061,20 +1062,36 @@ public struct IslandView: View {
         }
     }
     
+    private var trayContentHeight: CGFloat {
+        let count = ClipboardManager.shared.items.count
+        if count == 0 {
+            return 112
+        } else if count <= 4 {
+            return 112
+        } else {
+            return 190
+        }
+    }
+    
+    private var audioContentHeight: CGFloat {
+        let count = min(max(AudioMixerManager.shared.activeAppCount, 1), 5)
+        return CGFloat(30 + (count * 44))
+    }
+    
     private var tabContentHeight: CGFloat {
         switch activeTopTab {
         case "Tray":
-            return 186
+            return trayContentHeight
         case "Audio":
-            return 180
+            return audioContentHeight
         case "Settings":
             switch settingsSubTab {
             case "Style":
-                return 165
+                return 242
             case "Permissions":
-                return 165
+                return 156
             default: // "FaceID"
-                return 185
+                return 176
             }
         case "Calendar":
             return 92
@@ -1090,17 +1107,17 @@ public struct IslandView: View {
         guard isExpanded else { return 35 }
         switch activeTopTab {
         case "Tray":
-            return 242
+            return trayContentHeight + 56
         case "Audio":
-            return 236
+            return audioContentHeight + 56
         case "Settings":
             switch settingsSubTab {
             case "Style":
-                return 222
+                return 304
             case "Permissions":
-                return 222
+                return 218
             default: // "FaceID"
-                return 242
+                return 238
             }
         case "Calendar":
             return 152
@@ -1335,7 +1352,71 @@ public struct IslandView: View {
                 .buttonStyle(.plain)
             }
             
-            // Row 2: Çentikte Video Oynatıcı Toggle
+            // Row 2: Çentik Konumu (Sol, Orta, Sağ) - Sadece Çentik Adası modunda aktif
+            VStack(alignment: .leading, spacing: 6) {
+                HStack {
+                    Image(systemName: "slider.horizontal.below.rectangle")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundColor(settings.forceFloatingCapsule ? .white.opacity(0.3) : Color(red: 0.11, green: 0.84, blue: 0.38))
+                    Text("Çentik Konumu")
+                        .font(.system(size: 11, weight: .bold, design: .rounded))
+                        .foregroundColor(settings.forceFloatingCapsule ? .white.opacity(0.4) : .white)
+                    
+                    Spacer()
+                    
+                    if settings.forceFloatingCapsule {
+                        Text("Sadece Çentik Adasında")
+                            .font(.system(size: 9.5))
+                            .foregroundColor(.white.opacity(0.4))
+                    }
+                }
+                
+                HStack(spacing: 8) {
+                    ForEach(NotchAlignment.allCases, id: \.self) { alignment in
+                        Button(action: {
+                            withAnimation(.spring(response: 0.28, dampingFraction: 0.7)) {
+                                settings.notchAlignment = alignment
+                            }
+                        }) {
+                            HStack(spacing: 5) {
+                                Image(systemName: alignment.iconName)
+                                    .font(.system(size: 11, weight: .medium))
+                                Text(alignment.displayName)
+                                    .font(.system(size: 11, weight: .semibold, design: .rounded))
+                            }
+                            .foregroundColor(settings.notchAlignment == alignment && !settings.forceFloatingCapsule ? .white : .white.opacity(settings.forceFloatingCapsule ? 0.3 : 0.65))
+                            .frame(maxWidth: .infinity, minHeight: 28)
+                            .background(
+                                settings.notchAlignment == alignment && !settings.forceFloatingCapsule
+                                ? Color.green.opacity(0.35)
+                                : Color.white.opacity(0.06)
+                            )
+                            .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 6, style: .continuous)
+                                    .stroke(
+                                        settings.notchAlignment == alignment && !settings.forceFloatingCapsule
+                                        ? Color.green.opacity(0.7)
+                                        : Color.white.opacity(0.08),
+                                        lineWidth: 1
+                                    )
+                            )
+                        }
+                        .buttonStyle(.plain)
+                        .disabled(settings.forceFloatingCapsule)
+                    }
+                }
+            }
+            .padding(10)
+            .background(Color.white.opacity(0.04))
+            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .stroke(Color.white.opacity(0.08), lineWidth: 1)
+            )
+            .opacity(settings.forceFloatingCapsule ? 0.45 : 1.0)
+            
+            // Row 3: Çentikte Video Oynatıcı Toggle
             Button(action: {
                 withAnimation(AnimationConstants.quickInteractive) {
                     settings.enableNotchVideoPlayer.toggle()
@@ -1344,12 +1425,12 @@ public struct IslandView: View {
                 HStack(spacing: 12) {
                     ZStack {
                         RoundedRectangle(cornerRadius: 8, style: .continuous)
-                            .fill(settings.enableNotchVideoPlayer ? Color.red.opacity(0.25) : Color.white.opacity(0.08))
+                            .fill(settings.enableNotchVideoPlayer ? Color.green.opacity(0.20) : Color.white.opacity(0.08))
                             .frame(width: 32, height: 32)
                         
                         Image(systemName: "play.tv.fill")
                             .font(.system(size: 14, weight: .bold))
-                            .foregroundColor(settings.enableNotchVideoPlayer ? .red : .white.opacity(0.75))
+                            .foregroundColor(settings.enableNotchVideoPlayer ? Color(red: 0.11, green: 0.84, blue: 0.38) : .white.opacity(0.75))
                     }
                     
                     VStack(alignment: .leading, spacing: 2) {
@@ -1367,14 +1448,15 @@ public struct IslandView: View {
                     Toggle("", isOn: Binding(get: { settings.enableNotchVideoPlayer }, set: { settings.enableNotchVideoPlayer = $0 }))
                         .toggleStyle(.switch)
                         .labelsHidden()
+                        .tint(Color(red: 0.11, green: 0.84, blue: 0.38))
                         .scaleEffect(0.8)
                 }
                 .padding(10)
-                .background(settings.enableNotchVideoPlayer ? Color.red.opacity(0.12) : Color.white.opacity(0.04))
+                .background(settings.enableNotchVideoPlayer ? Color.green.opacity(0.12) : Color.white.opacity(0.04))
                 .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
                 .overlay(
                     RoundedRectangle(cornerRadius: 10, style: .continuous)
-                        .stroke(settings.enableNotchVideoPlayer ? Color.red.opacity(0.40) : Color.white.opacity(0.08), lineWidth: 1)
+                        .stroke(settings.enableNotchVideoPlayer ? Color.green.opacity(0.50) : Color.white.opacity(0.08), lineWidth: 1)
                 )
             }
             .buttonStyle(.plain)

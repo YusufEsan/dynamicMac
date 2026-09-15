@@ -189,6 +189,12 @@ public final class NowPlayingManager {
                         detectedApp = "Chrome"
                     }
                     
+                    if (detectedApp == "Chrome" || detectedApp == "YouTube") && !isMediaPlaying {
+                        // Browser video is paused/closed: verify actual tab media rather than stale cache
+                        self.fetchChromeMediaState(mediaRemotePlaying: false)
+                        return
+                    }
+                    
                     DispatchQueue.main.async {
                         self.isPlaying = isMediaPlaying
                         self.title = trackTitle
@@ -293,6 +299,27 @@ public final class NowPlayingManager {
             let status = parts.first ?? "stopped"
             
             if status == "stats" && parts.count >= 6 {
+                let urlString = parts[2]
+                let isMedia = Self.isMediaUrl(urlString)
+                let isYT = urlString.contains("youtube.com") || parts[1].contains("YouTube")
+                let rawCurr = parts[3].trimmingCharacters(in: .whitespacesAndNewlines)
+                let rawDur = parts[4].trimmingCharacters(in: .whitespacesAndNewlines)
+                let isPlayingFlag = parts[5].trimmingCharacters(in: .whitespacesAndNewlines)
+                let isVideoPlaying = (isPlayingFlag == "1")
+                
+                if !isMedia && !isVideoPlaying {
+                    self.isPlaying = false
+                    self.playbackRate = 0.0
+                    self.title = "Müzik Çalmıyor"
+                    self.artist = ""
+                    self.artwork = nil
+                    self.duration = 0.0
+                    self.basePosition = 0.0
+                    self.lastActiveUrl = ""
+                    self.activePlayerName = ""
+                    return
+                }
+                
                 var cleanTitle = parts[1]
                     .replacingOccurrences(of: " - Google Chrome", with: "")
                     .replacingOccurrences(of: " - YouTube", with: "")
@@ -308,16 +335,9 @@ public final class NowPlayingManager {
                     }
                 }
                 
-                let urlString = parts[2]
                 self.lastActiveUrl = urlString
-                let isYT = urlString.contains("youtube.com") || parts[1].contains("YouTube")
-                let rawCurr = parts[3].trimmingCharacters(in: .whitespacesAndNewlines)
-                let rawDur = parts[4].trimmingCharacters(in: .whitespacesAndNewlines)
-                let isPlayingFlag = parts[5].trimmingCharacters(in: .whitespacesAndNewlines)
-                
                 let parsedCurrent = Self.parseTimeString(rawCurr)
                 let parsedDuration = Self.parseTimeString(rawDur)
-                let isVideoPlaying = (isPlayingFlag == "1")
                 
                 self.isPlaying = isVideoPlaying
                 self.title = cleanTitle.isEmpty ? (isYT ? "YouTube Video" : "Web Video / Film") : cleanTitle
@@ -331,16 +351,6 @@ public final class NowPlayingManager {
                 
                 self.loadBrowserArtwork(urlString: urlString, isYT: isYT)
             } else if status == "info" && parts.count >= 3 {
-                var cleanTitle = parts[1]
-                    .replacingOccurrences(of: " - Google Chrome", with: "")
-                    .replacingOccurrences(of: " - YouTube", with: "")
-                    .replacingOccurrences(of: "YouTube - ", with: "")
-                    .trimmingCharacters(in: .whitespacesAndNewlines)
-                
-                if let pipeIdx = cleanTitle.lastIndex(of: "|") {
-                    cleanTitle = String(cleanTitle[..<pipeIdx]).trimmingCharacters(in: .whitespacesAndNewlines)
-                }
-                
                 let urlString = parts[2]
                 let isMedia = Self.isMediaUrl(urlString)
                 let isYT = urlString.contains("youtube.com") || parts[1].contains("YouTube")
@@ -348,6 +358,16 @@ public final class NowPlayingManager {
                 self.lastActiveUrl = urlString
                 
                 if isMedia {
+                    var cleanTitle = parts[1]
+                        .replacingOccurrences(of: " - Google Chrome", with: "")
+                        .replacingOccurrences(of: " - YouTube", with: "")
+                        .replacingOccurrences(of: "YouTube - ", with: "")
+                        .trimmingCharacters(in: .whitespacesAndNewlines)
+                    
+                    if let pipeIdx = cleanTitle.lastIndex(of: "|") {
+                        cleanTitle = String(cleanTitle[..<pipeIdx]).trimmingCharacters(in: .whitespacesAndNewlines)
+                    }
+                    
                     var parsedCurrent: Double = 0
                     if let tRange = urlString.range(of: "t=") {
                         let tSub = urlString[tRange.upperBound...]
@@ -387,6 +407,8 @@ public final class NowPlayingManager {
                     self.artwork = nil
                     self.duration = 0.0
                     self.basePosition = 0.0
+                    self.lastActiveUrl = ""
+                    self.activePlayerName = ""
                 }
             } else if self.activePlayerName == "Chrome" || self.activePlayerName == "YouTube" {
                 self.isPlaying = false
@@ -396,6 +418,8 @@ public final class NowPlayingManager {
                 self.artwork = nil
                 self.duration = 0.0
                 self.basePosition = 0.0
+                self.lastActiveUrl = ""
+                self.activePlayerName = ""
             }
         }
     }
@@ -428,7 +452,10 @@ public final class NowPlayingManager {
     
     public static func isMediaUrl(_ urlString: String) -> Bool {
         let lower = urlString.lowercased()
-        if lower.contains("youtube.com/watch") || lower.contains("youtu.be/") { return true }
+        if lower == "https://www.youtube.com" || lower == "https://www.youtube.com/" || lower == "http://www.youtube.com" || lower == "http://www.youtube.com/" || lower.contains("youtube.com/feed") || lower.contains("youtube.com/@") || lower.contains("youtube.com/channel") || lower.contains("youtube.com/results") {
+            return false
+        }
+        if lower.contains("youtube.com/watch") || lower.contains("youtube.com/shorts") || lower.contains("youtu.be/") || lower.contains("youtube.com/live") { return true }
         if lower.contains("netflix.com/watch") { return true }
         if lower.contains("myasiantv") && (lower.contains("/ep/") || lower.contains("/watch/")) { return true }
         if lower.contains("/video/") || lower.contains("/watch/") || lower.contains("/stream/") || lower.contains("/ep/") { return true }

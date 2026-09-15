@@ -36,11 +36,12 @@ public final class IslandHostingView<Content: View>: NSHostingView<Content> {
         
         let width: CGFloat = isExp ? 780 : 380
         let height: CGFloat = isExp ? 380 : 44
-        let yOffset: CGFloat = isTopAttached ? 0 : 2
+        let yOffset: CGFloat = isTopAttached ? 0 : 8
+        let rectX: CGFloat = (bounds.width - width) / 2.0
         
         let rectY = self.isFlipped ? yOffset : (bounds.height - height - yOffset)
         let islandRect = CGRect(
-            x: (bounds.width - width) / 2.0,
+            x: rectX,
             y: rectY,
             width: width,
             height: height

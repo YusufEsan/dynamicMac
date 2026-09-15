@@ -2,6 +2,30 @@ import Foundation
 import ServiceManagement
 import AppKit
 
+public enum NotchAlignment: String, CaseIterable, Identifiable {
+    case left = "left"
+    case center = "center"
+    case right = "right"
+    
+    public var id: String { rawValue }
+    
+    public var displayName: String {
+        switch self {
+        case .left: return "Sol"
+        case .center: return "Orta"
+        case .right: return "Sağ"
+        }
+    }
+    
+    public var iconName: String {
+        switch self {
+        case .left: return "align.horizontal.left"
+        case .center: return "align.horizontal.center"
+        case .right: return "align.horizontal.right"
+        }
+    }
+}
+
 @Observable
 public final class SettingsManager {
     public static let shared = SettingsManager()
@@ -19,6 +43,25 @@ public final class SettingsManager {
         set {
             UserDefaults.standard.set(newValue, forKey: "FaceIsland_ForceFloatingCapsule")
             applyIslandDisplayMode()
+        }
+    }
+    
+    public var notchAlignment: NotchAlignment {
+        get {
+            let raw = UserDefaults.standard.string(forKey: "FaceIsland_NotchAlignment") ?? "center"
+            return NotchAlignment(rawValue: raw) ?? .center
+        }
+        set {
+            UserDefaults.standard.set(newValue.rawValue, forKey: "FaceIsland_NotchAlignment")
+            if Thread.isMainThread {
+                MainActor.assumeIsolated {
+                    IslandWindowController.shared.repositionWindow()
+                }
+            } else {
+                DispatchQueue.main.async {
+                    IslandWindowController.shared.repositionWindow()
+                }
+            }
         }
     }
     

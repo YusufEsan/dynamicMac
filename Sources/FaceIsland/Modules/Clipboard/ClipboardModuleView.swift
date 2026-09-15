@@ -90,7 +90,7 @@ public struct ClipboardModuleView: View {
             if displayedItems.isEmpty {
                 emptyStateView
             } else {
-                ScrollView(.vertical, showsIndicators: false) {
+                ScrollView(.vertical, showsIndicators: displayedItems.count > 8) {
                     LazyVGrid(columns: [
                         GridItem(.flexible(), spacing: 8),
                         GridItem(.flexible(), spacing: 8),
@@ -104,7 +104,7 @@ public struct ClipboardModuleView: View {
                     .padding(.horizontal, 2)
                     .padding(.vertical, 2)
                 }
-                .frame(height: 152)
+                .frame(height: displayedItems.count <= 4 ? 70 : 148)
             }
         }
     }
@@ -206,30 +206,30 @@ public struct ClipboardModuleView: View {
             ZStack {
                 Circle()
                     .fill(Color.white.opacity(0.06))
-                    .frame(width: 44, height: 44)
+                    .frame(width: 36, height: 36)
                 
                 Image(systemName: "doc.on.clipboard")
-                    .font(.system(size: 20))
+                    .font(.system(size: 16))
                     .foregroundColor(.white.opacity(0.4))
             }
             
             VStack(alignment: .leading, spacing: 3) {
                 Text("Pano Geçmişi Boş")
-                    .font(.system(size: 13, weight: .semibold, design: .rounded))
+                    .font(.system(size: 12, weight: .semibold, design: .rounded))
                     .foregroundColor(.white)
                 
                 Text("Mac veya iPhone'unuzdan metin kopyaladığınızda burada görünecektir.")
-                    .font(.system(size: 11))
+                    .font(.system(size: 10.5))
                     .foregroundColor(.white.opacity(0.55))
                     .lineLimit(1)
             }
             
             Spacer()
         }
-        .padding(.horizontal, 16)
-        .frame(height: 140)
+        .padding(.horizontal, 14)
+        .frame(height: 70)
         .background(Color.white.opacity(0.04))
-        .cornerRadius(12)
+        .cornerRadius(10)
     }
     
     private func filterButton(title: String, icon: String? = nil, isSelected: Bool, action: @escaping () -> Void) -> some View {
