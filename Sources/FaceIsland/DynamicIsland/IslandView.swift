@@ -33,7 +33,7 @@ public struct IslandView: View {
     public var body: some View {
         @Bindable var settings = settings
         VStack(spacing: 0) {
-            ZStack {
+            ZStack(alignment: .top) {
                 // Pitch Black Card Background with subtle frosted stroke & liquid glow (No top edge stroke)
                 IslandSquircle(cornerRadius: isExpanded ? 24 : 16, isTopAttached: isTopAttached)
                     .fill(Color.black)
@@ -53,12 +53,6 @@ public struct IslandView: View {
                                 ),
                                 lineWidth: faceRecognition.isRecognized || faceRecognition.isScanning ? 1.6 : 1.0
                             )
-                    )
-                    .shadow(
-                        color: faceRecognition.isRecognized ? Color(red: 0.11, green: 0.84, blue: 0.38).opacity(0.60) : (faceRecognition.isScanning ? Color.cyan.opacity(0.45) : (music.isPlaying && !isVideoPlayerActive ? music.themeColor.opacity(0.30) : Color.black.opacity(0.85))),
-                        radius: isExpanded ? 28 : (faceRecognition.isRecognized || faceRecognition.isScanning ? 18 : 10),
-                        x: 0,
-                        y: isExpanded ? 10 : 2
                     )
                 
                 // Ambient Radial Glow when Music is Playing or Face ID Recognized
@@ -110,7 +104,8 @@ public struct IslandView: View {
             .contentShape(Rectangle())
             .frame(
                 width: islandWidth,
-                height: islandHeight
+                height: islandHeight,
+                alignment: .top
             )
             .animation(AnimationConstants.islandMorphSpring, value: islandWidth)
             .animation(AnimationConstants.islandMorphSpring, value: islandHeight)
@@ -135,23 +130,41 @@ public struct IslandView: View {
             startRadarAnimation()
             updateVisualDimensions()
         }
-        .onChange(of: provider.expansionState) { _ in
+        .onChange(of: provider.expansionState) {
             if case .compact = provider.expansionState {
                 isShowingSettingsInVideoMode = false
+                activeTopTab = "Music"
             }
             updateVisualDimensions()
         }
-        .onChange(of: activeTopTab) { _ in
+        .onChange(of: activeTopTab) {
             updateVisualDimensions()
         }
-        .onChange(of: isVideoPlayerActive) { _ in
+        .onChange(of: settingsSubTab) {
             updateVisualDimensions()
+        }
+        .onChange(of: AudioMixerManager.shared.activeAppCount) {
+            updateVisualDimensions()
+        }
+        .onChange(of: isVideoPlayerActive) {
+            updateVisualDimensions()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("FaceIsland_OpenInIslandSettings"))) { _ in
+            withAnimation(AnimationConstants.islandMorphSpring) {
+                activeTopTab = "Settings"
+                settingsSubTab = "FaceID"
+                provider.expand(to: .faceID)
+            }
         }
     }
     
     private func updateVisualDimensions() {
-        IslandContentProvider.shared.currentVisualWidth = islandWidth
-        IslandContentProvider.shared.currentVisualHeight = islandHeight
+        let width = islandWidth
+        let height = islandHeight
+        DispatchQueue.main.async {
+            IslandContentProvider.shared.currentVisualWidth = width
+            IslandContentProvider.shared.currentVisualHeight = height
+        }
     }
     
     private var formattedUserName: String {
@@ -165,7 +178,7 @@ public struct IslandView: View {
     }
     
     private var isFaceIDActive: Bool {
-        ScreenLockMonitor.shared.isScreenLocked || faceRecognition.isScanning || faceRecognition.isRecognized || faceRecognition.currentState == .notRecognized
+        faceRecognition.isScanning || faceRecognition.isRecognized || (ScreenLockMonitor.shared.isScreenLocked && faceRecognition.currentState == .notRecognized)
     }
     
     // MARK: - Compact Notch Idle Content
@@ -175,9 +188,21 @@ public struct IslandView: View {
             if isFaceIDActive {
                 if faceRecognition.isScanning {
                     ZStack {
-                        Circle()
-                            .fill(Color(red: 0.11, green: 0.84, blue: 0.38).opacity(0.2))
-                            .frame(width: 20, height: 20)
+                        TimelineView(.animation) { timeline in
+                            let phase = timeline.date.timeIntervalSinceReferenceDate
+                            let angle = (phase * 220).truncatingRemainder(dividingBy: 360)
+                            Circle()
+                                .trim(from: 0.0, to: 0.4)
+                                .stroke(
+                                    AngularGradient(
+                                        colors: [Color.green.opacity(0.0), Color(red: 0.11, green: 0.84, blue: 0.38)],
+                                        center: .center
+                                    ),
+                                    style: StrokeStyle(lineWidth: 2.2, lineCap: .round)
+                                )
+                                .frame(width: 22, height: 22)
+                                .rotationEffect(.degrees(angle))
+                        }
                         Image(systemName: "faceid")
                             .font(.system(size: 11, weight: .bold))
                             .foregroundColor(Color(red: 0.11, green: 0.84, blue: 0.38))
@@ -354,137 +379,242 @@ public struct IslandView: View {
     // MARK: - Pixel-Perfect Dashboard with 3 Full Dedicated Tabs
     private var nookDashboardView: some View {
         VStack(spacing: 8) {
-            // Top Bar: [🎵 Medya] [📅 Takvim] [🧰 Tepsi] ... [⚙️] [✖]
+            // Top Header Bar: Segmented Tabs (Left) + Close & Settings (Right)
             HStack(spacing: 10) {
-                // 3 Segmented Pill Buttons
-                HStack(spacing: 7) {
-                    // 1. Media Tab (Spotify / YouTube / Apple Music / Browser)
-                    Button(action: {
-                        withAnimation(AnimationConstants.quickInteractive) {
-                            activeTopTab = "Music"
-                            isShowingSettingsInVideoMode = false
-                        }
-                    }) {
-                        HStack(spacing: 4) {
-                            if music.isSpotify {
-                                SpotifyLogoShape(size: 10, iconColor: activeTopTab == "Music" ? .green : .white.opacity(0.6))
-                            } else if music.isYouTube {
-                                Image(systemName: "play.rectangle.fill")
-                                    .font(.system(size: 10))
-                                    .foregroundColor(activeTopTab == "Music" ? .red : .white.opacity(0.6))
-                            } else {
-                                Image(systemName: "play.tv.fill")
-                                    .font(.system(size: 10))
-                                    .foregroundColor(activeTopTab == "Music" ? Color(red: 0.11, green: 0.84, blue: 0.38) : .white.opacity(0.6))
+                if activeTopTab == "Settings" {
+                    // Settings Sub-Tabs
+                    HStack(spacing: 7) {
+                        Button(action: {
+                            withAnimation(AnimationConstants.quickInteractive) {
+                                settingsSubTab = "FaceID"
                             }
-                            Text("Medya")
-                                .font(.system(size: 11, weight: .bold, design: .rounded))
+                        }) {
+                            HStack(spacing: 4) {
+                                Image(systemName: "faceid")
+                                    .font(.system(size: 11, weight: .bold))
+                                Text("Face ID")
+                                    .font(.system(size: 11, weight: .bold, design: .rounded))
+                            }
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 4.5)
+                            .background(
+                                settingsSubTab == "FaceID" ?
+                                Color.green.opacity(0.24) :
+                                Color.white.opacity(0.06)
+                            )
+                            .foregroundColor(settingsSubTab == "FaceID" ? Color(red: 0.11, green: 0.84, blue: 0.38) : .white.opacity(0.65))
+                            .clipShape(Capsule())
+                            .overlay(
+                                Capsule()
+                                    .stroke(settingsSubTab == "FaceID" ? Color.green.opacity(0.55) : Color.clear, lineWidth: 1)
+                            )
                         }
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 4.5)
-                        .background(
-                            activeTopTab == "Music" ?
-                            LinearGradient(colors: music.isSpotify ? [Color.green.opacity(0.35), Color.mint.opacity(0.18)] : (music.isYouTube ? [Color.red.opacity(0.35), Color.orange.opacity(0.18)] : [Color(red: 0.11, green: 0.84, blue: 0.38).opacity(0.35), Color.mint.opacity(0.18)]), startPoint: .topLeading, endPoint: .bottomTrailing) :
-                            LinearGradient(colors: [Color.white.opacity(0.06), Color.white.opacity(0.04)], startPoint: .topLeading, endPoint: .bottomTrailing)
-                        )
-                        .foregroundColor(activeTopTab == "Music" ? .white : .white.opacity(0.65))
-                        .clipShape(Capsule())
-                        .overlay(
-                            Capsule()
-                                .stroke(activeTopTab == "Music" ? (music.isSpotify ? Color.green.opacity(0.5) : (music.isYouTube ? Color.red.opacity(0.5) : Color(red: 0.11, green: 0.84, blue: 0.38).opacity(0.5))) : Color.clear, lineWidth: 1)
-                        )
+                        .buttonStyle(.plain)
+                        
+                        Button(action: {
+                            withAnimation(AnimationConstants.quickInteractive) {
+                                settingsSubTab = "Style"
+                            }
+                        }) {
+                            HStack(spacing: 4) {
+                                Image(systemName: "square.dashed")
+                                    .font(.system(size: 11, weight: .bold))
+                                Text("Ada Stili")
+                                    .font(.system(size: 11, weight: .bold, design: .rounded))
+                            }
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 4.5)
+                            .background(
+                                settingsSubTab == "Style" ?
+                                Color.green.opacity(0.24) :
+                                Color.white.opacity(0.06)
+                            )
+                            .foregroundColor(settingsSubTab == "Style" ? Color(red: 0.11, green: 0.84, blue: 0.38) : .white.opacity(0.65))
+                            .clipShape(Capsule())
+                            .overlay(
+                                Capsule()
+                                    .stroke(settingsSubTab == "Style" ? Color.green.opacity(0.55) : Color.clear, lineWidth: 1)
+                            )
+                        }
+                        .buttonStyle(.plain)
+                        
+                        Button(action: {
+                            withAnimation(AnimationConstants.quickInteractive) {
+                                settingsSubTab = "Permissions"
+                            }
+                        }) {
+                            HStack(spacing: 4) {
+                                Image(systemName: "hand.raised.badge.checkmark")
+                                    .font(.system(size: 11, weight: .bold))
+                                Text("İzinler")
+                                    .font(.system(size: 11, weight: .bold, design: .rounded))
+                            }
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 4.5)
+                            .background(
+                                settingsSubTab == "Permissions" ?
+                                Color.green.opacity(0.24) :
+                                Color.white.opacity(0.06)
+                            )
+                            .foregroundColor(settingsSubTab == "Permissions" ? Color(red: 0.11, green: 0.84, blue: 0.38) : .white.opacity(0.65))
+                            .clipShape(Capsule())
+                            .overlay(
+                                Capsule()
+                                    .stroke(settingsSubTab == "Permissions" ? Color.green.opacity(0.55) : Color.clear, lineWidth: 1)
+                            )
+                        }
+                        .buttonStyle(.plain)
+                        
+                        if settingsSubTab == "Permissions" {
+                            Button(action: {
+                                permissions.checkAll()
+                            }) {
+                                HStack(spacing: 3.5) {
+                                    Image(systemName: "arrow.clockwise")
+                                        .font(.system(size: 9, weight: .bold))
+                                    Text("Yenile")
+                                        .font(.system(size: 10, weight: .semibold, design: .rounded))
+                                }
+                                .foregroundColor(.white.opacity(0.85))
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 4)
+                                .background(Color.white.opacity(0.08))
+                                .clipShape(Capsule())
+                            }
+                            .buttonStyle(.plain)
+                        }
                     }
-                    .buttonStyle(.plain)
-                    
-                    // 2. Calendar Tab
-                    Button(action: {
-                        withAnimation(AnimationConstants.quickInteractive) {
-                            activeTopTab = "Calendar"
-                            isShowingSettingsInVideoMode = false
+                } else {
+                    // Standard Module Tabs
+                    HStack(spacing: 7) {
+                        // 1. Media Tab (Spotify / YouTube / Apple Music / Browser)
+                        Button(action: {
+                            withAnimation(AnimationConstants.quickInteractive) {
+                                activeTopTab = "Music"
+                                isShowingSettingsInVideoMode = false
+                            }
+                        }) {
+                            HStack(spacing: 4) {
+                                if music.isSpotify {
+                                    SpotifyLogoShape(size: 10, iconColor: activeTopTab == "Music" ? .green : .white.opacity(0.6))
+                                } else if music.isYouTube {
+                                    Image(systemName: "play.rectangle.fill")
+                                        .font(.system(size: 10))
+                                        .foregroundColor(activeTopTab == "Music" ? .red : .white.opacity(0.6))
+                                } else {
+                                    Image(systemName: "play.tv.fill")
+                                        .font(.system(size: 10))
+                                        .foregroundColor(activeTopTab == "Music" ? Color(red: 0.11, green: 0.84, blue: 0.38) : .white.opacity(0.6))
+                                }
+                                Text("Medya")
+                                    .font(.system(size: 11, weight: .bold, design: .rounded))
+                            }
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 4.5)
+                            .background(
+                                activeTopTab == "Music" ?
+                                LinearGradient(colors: music.isSpotify ? [Color.green.opacity(0.35), Color.mint.opacity(0.18)] : (music.isYouTube ? [Color.red.opacity(0.35), Color.orange.opacity(0.18)] : [Color(red: 0.11, green: 0.84, blue: 0.38).opacity(0.35), Color.mint.opacity(0.18)]), startPoint: .topLeading, endPoint: .bottomTrailing) :
+                                LinearGradient(colors: [Color.white.opacity(0.06), Color.white.opacity(0.04)], startPoint: .topLeading, endPoint: .bottomTrailing)
+                            )
+                            .foregroundColor(activeTopTab == "Music" ? .white : .white.opacity(0.65))
+                            .clipShape(Capsule())
+                            .overlay(
+                                Capsule()
+                                    .stroke(activeTopTab == "Music" ? (music.isSpotify ? Color.green.opacity(0.5) : (music.isYouTube ? Color.red.opacity(0.5) : Color(red: 0.11, green: 0.84, blue: 0.38).opacity(0.5))) : Color.clear, lineWidth: 1)
+                            )
                         }
-                    }) {
-                        HStack(spacing: 4) {
-                            Image(systemName: "calendar")
-                                .font(.system(size: 10))
-                                .foregroundColor(activeTopTab == "Calendar" ? .orange : .white.opacity(0.6))
-                            Text("Takvim")
-                                .font(.system(size: 11, weight: .bold, design: .rounded))
+                        .buttonStyle(.plain)
+                        
+                        // 2. Calendar Tab
+                        Button(action: {
+                            withAnimation(AnimationConstants.quickInteractive) {
+                                activeTopTab = "Calendar"
+                                isShowingSettingsInVideoMode = false
+                            }
+                        }) {
+                            HStack(spacing: 4) {
+                                Image(systemName: "calendar")
+                                    .font(.system(size: 10))
+                                    .foregroundColor(activeTopTab == "Calendar" ? .orange : .white.opacity(0.6))
+                                Text("Takvim")
+                                    .font(.system(size: 11, weight: .bold, design: .rounded))
+                            }
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 4.5)
+                            .background(
+                                activeTopTab == "Calendar" ?
+                                LinearGradient(colors: [Color.orange.opacity(0.38), Color.yellow.opacity(0.20)], startPoint: .topLeading, endPoint: .bottomTrailing) :
+                                LinearGradient(colors: [Color.white.opacity(0.06), Color.white.opacity(0.04)], startPoint: .topLeading, endPoint: .bottomTrailing)
+                            )
+                            .foregroundColor(activeTopTab == "Calendar" ? .white : .white.opacity(0.65))
+                            .clipShape(Capsule())
+                            .overlay(
+                                Capsule()
+                                    .stroke(activeTopTab == "Calendar" ? Color.orange.opacity(0.5) : Color.clear, lineWidth: 1)
+                            )
                         }
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 4.5)
-                        .background(
-                            activeTopTab == "Calendar" ?
-                            LinearGradient(colors: [Color.orange.opacity(0.38), Color.yellow.opacity(0.20)], startPoint: .topLeading, endPoint: .bottomTrailing) :
-                            LinearGradient(colors: [Color.white.opacity(0.06), Color.white.opacity(0.04)], startPoint: .topLeading, endPoint: .bottomTrailing)
-                        )
-                        .foregroundColor(activeTopTab == "Calendar" ? .white : .white.opacity(0.65))
-                        .clipShape(Capsule())
-                        .overlay(
-                            Capsule()
-                                .stroke(activeTopTab == "Calendar" ? Color.orange.opacity(0.5) : Color.clear, lineWidth: 1)
-                        )
+                        .buttonStyle(.plain)
+                        
+                        // 3. Clipboard / Tray Tab
+                        Button(action: {
+                            withAnimation(AnimationConstants.quickInteractive) {
+                                activeTopTab = "Tray"
+                                isShowingSettingsInVideoMode = false
+                            }
+                        }) {
+                            HStack(spacing: 4) {
+                                Image(systemName: "tray.full.fill")
+                                    .font(.system(size: 10))
+                                    .foregroundColor(activeTopTab == "Tray" ? .cyan : .white.opacity(0.6))
+                                Text("Pano")
+                                    .font(.system(size: 11, weight: .bold, design: .rounded))
+                            }
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 4.5)
+                            .background(
+                                activeTopTab == "Tray" ?
+                                LinearGradient(colors: [Color.blue.opacity(0.38), Color.cyan.opacity(0.20)], startPoint: .topLeading, endPoint: .bottomTrailing) :
+                                LinearGradient(colors: [Color.white.opacity(0.06), Color.white.opacity(0.04)], startPoint: .topLeading, endPoint: .bottomTrailing)
+                            )
+                            .foregroundColor(activeTopTab == "Tray" ? .white : .white.opacity(0.65))
+                            .clipShape(Capsule())
+                            .overlay(
+                                Capsule()
+                                    .stroke(activeTopTab == "Tray" ? Color.cyan.opacity(0.5) : Color.clear, lineWidth: 1)
+                            )
+                        }
+                        .buttonStyle(.plain)
+                        
+                        // 4. Audio Mixer Tab
+                        Button(action: {
+                            withAnimation(AnimationConstants.quickInteractive) {
+                                activeTopTab = "Audio"
+                                isShowingSettingsInVideoMode = false
+                            }
+                        }) {
+                            HStack(spacing: 4) {
+                                Image(systemName: "speaker.wave.2.fill")
+                                    .font(.system(size: 10))
+                                    .foregroundColor(activeTopTab == "Audio" ? Color(red: 0.11, green: 0.84, blue: 0.38) : .white.opacity(0.6))
+                                Text("Ses")
+                                    .font(.system(size: 11, weight: .bold, design: .rounded))
+                            }
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 4.5)
+                            .background(
+                                activeTopTab == "Audio" ?
+                                LinearGradient(colors: [Color.green.opacity(0.35), Color.mint.opacity(0.18)], startPoint: .topLeading, endPoint: .bottomTrailing) :
+                                LinearGradient(colors: [Color.white.opacity(0.06), Color.white.opacity(0.04)], startPoint: .topLeading, endPoint: .bottomTrailing)
+                            )
+                            .foregroundColor(activeTopTab == "Audio" ? .white : .white.opacity(0.65))
+                            .clipShape(Capsule())
+                            .overlay(
+                                Capsule()
+                                    .stroke(activeTopTab == "Audio" ? Color.green.opacity(0.55) : Color.clear, lineWidth: 1)
+                            )
+                        }
+                        .buttonStyle(.plain)
                     }
-                    .buttonStyle(.plain)
-                    
-                    // 3. Clipboard / Tray Tab
-                    Button(action: {
-                        withAnimation(AnimationConstants.quickInteractive) {
-                            activeTopTab = "Tray"
-                            isShowingSettingsInVideoMode = false
-                        }
-                    }) {
-                        HStack(spacing: 4) {
-                            Image(systemName: "tray.full.fill")
-                                .font(.system(size: 10))
-                                .foregroundColor(activeTopTab == "Tray" ? .cyan : .white.opacity(0.6))
-                            Text("Pano")
-                                .font(.system(size: 11, weight: .bold, design: .rounded))
-                        }
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 4.5)
-                        .background(
-                            activeTopTab == "Tray" ?
-                            LinearGradient(colors: [Color.blue.opacity(0.38), Color.cyan.opacity(0.20)], startPoint: .topLeading, endPoint: .bottomTrailing) :
-                            LinearGradient(colors: [Color.white.opacity(0.06), Color.white.opacity(0.04)], startPoint: .topLeading, endPoint: .bottomTrailing)
-                        )
-                        .foregroundColor(activeTopTab == "Tray" ? .white : .white.opacity(0.65))
-                        .clipShape(Capsule())
-                        .overlay(
-                            Capsule()
-                                .stroke(activeTopTab == "Tray" ? Color.cyan.opacity(0.5) : Color.clear, lineWidth: 1)
-                        )
-                    }
-                    .buttonStyle(.plain)
-                    
-                    // 4. Audio Mixer Tab
-                    Button(action: {
-                        withAnimation(AnimationConstants.quickInteractive) {
-                            activeTopTab = "Audio"
-                            isShowingSettingsInVideoMode = false
-                        }
-                    }) {
-                        HStack(spacing: 4) {
-                            Image(systemName: "speaker.wave.2.fill")
-                                .font(.system(size: 10))
-                                .foregroundColor(activeTopTab == "Audio" ? Color(red: 0.11, green: 0.84, blue: 0.38) : .white.opacity(0.6))
-                            Text("Ses")
-                                .font(.system(size: 11, weight: .bold, design: .rounded))
-                        }
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 4.5)
-                        .background(
-                            activeTopTab == "Audio" ?
-                            LinearGradient(colors: [Color.green.opacity(0.35), Color.mint.opacity(0.18)], startPoint: .topLeading, endPoint: .bottomTrailing) :
-                            LinearGradient(colors: [Color.white.opacity(0.06), Color.white.opacity(0.04)], startPoint: .topLeading, endPoint: .bottomTrailing)
-                        )
-                        .foregroundColor(activeTopTab == "Audio" ? .white : .white.opacity(0.65))
-                        .clipShape(Capsule())
-                        .overlay(
-                            Capsule()
-                                .stroke(activeTopTab == "Audio" ? Color.green.opacity(0.55) : Color.clear, lineWidth: 1)
-                        )
-                    }
-                    .buttonStyle(.plain)
                 }
                 
                 Spacer()
@@ -520,8 +650,15 @@ public struct IslandView: View {
                 // Close Button
                 Button(action: {
                     withAnimation(AnimationConstants.islandMorphSpring) {
-                        provider.collapse()
-                        isShowingSettingsInVideoMode = false
+                        let isVideoPlaying = settings.enableNotchVideoPlayer && music.isPlaying && (music.isYouTube || (!music.lastActiveUrl.isEmpty && music.activePlayerName == "Chrome"))
+                        if isShowingSettingsInVideoMode || isVideoPlaying {
+                            activeTopTab = "Music"
+                            isShowingSettingsInVideoMode = false
+                        } else {
+                            provider.collapse()
+                            activeTopTab = "Music"
+                            isShowingSettingsInVideoMode = false
+                        }
                     }
                 }) {
                     Image(systemName: "xmark")
@@ -544,40 +681,36 @@ public struct IslandView: View {
                     // Full-Width Music Player
                     musicPlayerSection
                         .padding(.horizontal, 28)
-                        .padding(.bottom, 8)
-                        .frame(height: 92)
+                        .frame(height: tabContentHeight, alignment: .top)
                         .transition(.opacity)
                 } else if activeTopTab == "Calendar" {
                     // Full-Width Calendar Dashboard
                     calendarDateStripSection
                         .padding(.horizontal, 28)
-                        .padding(.bottom, 8)
-                        .frame(height: 92)
+                        .frame(height: tabContentHeight, alignment: .top)
                         .transition(.opacity)
                 } else if activeTopTab == "Tray" {
                     // Tray Tab View (Pano Geçmişi)
                     ClipboardModuleView()
                         .padding(.horizontal, 28)
-                        .padding(.bottom, 12)
-                        .frame(height: tabContentHeight)
+                        .frame(height: tabContentHeight, alignment: .top)
                         .transition(.opacity)
                 } else if activeTopTab == "Audio" {
                     // Per-App Audio Mixer Module
                     AudioMixerModuleView()
                         .padding(.horizontal, 28)
-                        .padding(.bottom, 10)
-                        .frame(height: tabContentHeight)
+                        .frame(height: tabContentHeight, alignment: .top)
                         .transition(.opacity)
                 } else if activeTopTab == "Settings" {
                     // In-Island Permissions & Settings View
                     islandSettingsAndPermissionsView
                         .padding(.horizontal, 28)
-                        .padding(.bottom, 10)
-                        .frame(height: tabContentHeight)
+                        .frame(height: tabContentHeight, alignment: .top)
                         .transition(.opacity)
                 }
             }
-            .frame(height: tabContentHeight)
+            .frame(height: tabContentHeight, alignment: .top)
+            .padding(.bottom, 12)
         }
     }
     
@@ -718,7 +851,7 @@ public struct IslandView: View {
                     .foregroundColor(.white.opacity(0.85))
                     .fixedSize(horizontal: true, vertical: false)
             }
-            .padding(.horizontal, 22)
+            .padding(.horizontal, 42)
             .padding(.top, 8)
             .padding(.bottom, 12)
         }
@@ -1105,7 +1238,7 @@ public struct IslandView: View {
     
     private var audioContentHeight: CGFloat {
         let count = min(max(AudioMixerManager.shared.activeAppCount, 1), 5)
-        return CGFloat(30 + (count * 44))
+        return CGFloat(24 + (count * 38))
     }
     
     private var tabContentHeight: CGFloat {
@@ -1117,16 +1250,16 @@ public struct IslandView: View {
         case "Settings":
             switch settingsSubTab {
             case "Style":
-                return 242
+                return 210
             case "Permissions":
-                return 156
+                return 114
             default: // "FaceID"
-                return 176
+                return 184
             }
         case "Calendar":
-            return 92
+            return 68
         default: // "Music"
-            return 92
+            return 70
         }
     }
     
@@ -1137,134 +1270,29 @@ public struct IslandView: View {
         guard isExpanded else { return 35 }
         switch activeTopTab {
         case "Tray":
-            return trayContentHeight + 56
+            return trayContentHeight + 64
         case "Audio":
-            return audioContentHeight + 56
+            return audioContentHeight + 64
         case "Settings":
             switch settingsSubTab {
             case "Style":
-                return 304
+                return 274
             case "Permissions":
-                return 218
+                return 178
             default: // "FaceID"
-                return 238
+                return 248
             }
         case "Calendar":
-            return 152
+            return 132
         default:
-            return 146
+            return 134
         }
     }
     
     // MARK: - In-Island Settings & Face ID View
     private var islandSettingsAndPermissionsView: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            // Sub-Bar Segments: [🛡️ Face ID & Kilit Açma] [🏝️ Ada Görünümü] [⚙️ Sistem İzinleri]
-            HStack(spacing: 7) {
-                Button(action: {
-                    withAnimation(AnimationConstants.quickInteractive) {
-                        settingsSubTab = "FaceID"
-                    }
-                }) {
-                    HStack(spacing: 4) {
-                        Image(systemName: "faceid")
-                            .font(.system(size: 11, weight: .bold))
-                        Text("Face ID")
-                            .font(.system(size: 10.5, weight: .bold, design: .rounded))
-                    }
-                    .padding(.horizontal, 9)
-                    .padding(.vertical, 4.5)
-                    .background(
-                        settingsSubTab == "FaceID" ?
-                        Color.green.opacity(0.24) :
-                        Color.white.opacity(0.06)
-                    )
-                    .foregroundColor(settingsSubTab == "FaceID" ? Color(red: 0.11, green: 0.84, blue: 0.38) : .white.opacity(0.65))
-                    .clipShape(Capsule())
-                    .overlay(
-                        Capsule()
-                            .stroke(settingsSubTab == "FaceID" ? Color.green.opacity(0.55) : Color.clear, lineWidth: 1)
-                    )
-                }
-                .buttonStyle(.plain)
-                
-                Button(action: {
-                    withAnimation(AnimationConstants.quickInteractive) {
-                        settingsSubTab = "Style"
-                    }
-                }) {
-                    HStack(spacing: 4) {
-                        Image(systemName: "square.dashed")
-                            .font(.system(size: 11, weight: .bold))
-                        Text("Ada Stili")
-                            .font(.system(size: 10.5, weight: .bold, design: .rounded))
-                    }
-                    .padding(.horizontal, 9)
-                    .padding(.vertical, 4.5)
-                    .background(
-                        settingsSubTab == "Style" ?
-                        Color.green.opacity(0.24) :
-                        Color.white.opacity(0.06)
-                    )
-                    .foregroundColor(settingsSubTab == "Style" ? Color(red: 0.11, green: 0.84, blue: 0.38) : .white.opacity(0.65))
-                    .clipShape(Capsule())
-                    .overlay(
-                        Capsule()
-                            .stroke(settingsSubTab == "Style" ? Color.green.opacity(0.55) : Color.clear, lineWidth: 1)
-                    )
-                }
-                .buttonStyle(.plain)
-                
-                Button(action: {
-                    withAnimation(AnimationConstants.quickInteractive) {
-                        settingsSubTab = "Permissions"
-                    }
-                }) {
-                    HStack(spacing: 4) {
-                        Image(systemName: "hand.raised.badge.checkmark")
-                            .font(.system(size: 11, weight: .bold))
-                        Text("İzinler")
-                            .font(.system(size: 10.5, weight: .bold, design: .rounded))
-                    }
-                    .padding(.horizontal, 9)
-                    .padding(.vertical, 4.5)
-                    .background(
-                        settingsSubTab == "Permissions" ?
-                        Color.green.opacity(0.24) :
-                        Color.white.opacity(0.06)
-                    )
-                    .foregroundColor(settingsSubTab == "Permissions" ? Color(red: 0.11, green: 0.84, blue: 0.38) : .white.opacity(0.65))
-                    .clipShape(Capsule())
-                    .overlay(
-                        Capsule()
-                            .stroke(settingsSubTab == "Permissions" ? Color.green.opacity(0.55) : Color.clear, lineWidth: 1)
-                    )
-                }
-                .buttonStyle(.plain)
-                
-                Spacer()
-                
-                if settingsSubTab == "Permissions" {
-                    Button(action: {
-                        permissions.checkAll()
-                    }) {
-                        HStack(spacing: 4) {
-                            Image(systemName: "arrow.clockwise")
-                            Text("Yenile")
-                        }
-                        .font(.system(size: 10, weight: .semibold, design: .rounded))
-                        .foregroundColor(.white.opacity(0.85))
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 4)
-                        .background(Color.white.opacity(0.08))
-                        .clipShape(Capsule())
-                    }
-                    .buttonStyle(.plain)
-                }
-            }
-            .frame(height: 26)
-            
-            // Sub-Panel Content
+        VStack(alignment: .leading, spacing: 0) {
+            // Sub-Panel Content (Tabs are controlled in the top header)
             ZStack(alignment: .topLeading) {
                 if settingsSubTab == "FaceID" {
                     faceIDSettingsPanel
@@ -1274,9 +1302,9 @@ public struct IslandView: View {
                     permissionsSettingsPanel
                 }
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+            .frame(maxWidth: .infinity, alignment: .topLeading)
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .frame(maxWidth: .infinity, alignment: .topLeading)
     }
     
     // MARK: - Island Style Dedicated In-Island Panel
@@ -1775,6 +1803,55 @@ public struct IslandView: View {
                 RoundedRectangle(cornerRadius: 8, style: .continuous)
                     .stroke(Color.white.opacity(0.08), lineWidth: 1)
             )
+            
+            // Row 4: Widget Live Sync Toggle Card
+            Button(action: {
+                withAnimation(.spring(response: 0.28, dampingFraction: 0.7)) {
+                    settings.isWidgetSyncEnabled.toggle()
+                }
+            }) {
+                HStack(spacing: 8) {
+                    Image(systemName: "square.grid.2x2.fill")
+                        .font(.system(size: 11))
+                        .foregroundColor(settings.isWidgetSyncEnabled ? Color(red: 0.11, green: 0.84, blue: 0.38) : .white.opacity(0.5))
+                        .frame(width: 24, height: 24)
+                        .background(settings.isWidgetSyncEnabled ? Color.green.opacity(0.20) : Color.white.opacity(0.08))
+                        .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+                    
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text("Widget Canlı Senkronizasyonu")
+                            .font(.system(size: 11, weight: .semibold, design: .rounded))
+                            .foregroundColor(.white.opacity(0.92))
+                        Text(settings.isWidgetSyncEnabled ? "Aktif (Canlı Animasyon & Durum İletiliyor)" : "Devre Dışı")
+                            .font(.system(size: 9.5))
+                            .foregroundColor(settings.isWidgetSyncEnabled ? Color(red: 0.11, green: 0.84, blue: 0.38) : .white.opacity(0.45))
+                    }
+                    
+                    Spacer(minLength: 4)
+                    
+                    ZStack(alignment: settings.isWidgetSyncEnabled ? .trailing : .leading) {
+                        Capsule()
+                            .fill(settings.isWidgetSyncEnabled ? Color(red: 0.11, green: 0.84, blue: 0.38) : Color.white.opacity(0.20))
+                            .frame(width: 30, height: 17)
+                            .shadow(color: settings.isWidgetSyncEnabled ? Color.green.opacity(0.5) : Color.clear, radius: 3)
+                        
+                        Circle()
+                            .fill(Color.white)
+                            .frame(width: 13, height: 13)
+                            .padding(2)
+                    }
+                }
+                .padding(.horizontal, 10)
+                .padding(.vertical, 6)
+                .frame(maxWidth: .infinity)
+                .background(Color.white.opacity(0.05))
+                .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                        .stroke(settings.isWidgetSyncEnabled ? Color.green.opacity(0.3) : Color.white.opacity(0.08), lineWidth: 1)
+                )
+            }
+            .buttonStyle(.plain)
         }
         .frame(maxWidth: .infinity)
     }

@@ -9,32 +9,12 @@ public final class SettingsWindowController {
     private init() {}
     
     public func show() {
-        if let existing = window, existing.isVisible {
-            NSApp.activate(ignoringOtherApps: true)
-            existing.makeKeyAndOrderFront(nil)
-            existing.orderFrontRegardless()
-            return
+        if let existing = window {
+            existing.close()
+            self.window = nil
         }
         
-        let settingsView = SettingsView()
-        let hostingController = NSHostingController(rootView: settingsView)
-        
-        let newWindow = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 720, height: 540),
-            styleMask: [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView],
-            backing: .buffered,
-            defer: false
-        )
-        newWindow.title = "FaceIsland Ayarları"
-        newWindow.titlebarAppearsTransparent = true
-        newWindow.isReleasedWhenClosed = false
-        newWindow.level = .floating
-        newWindow.center()
-        newWindow.contentViewController = hostingController
-        
-        self.window = newWindow
-        NSApp.activate(ignoringOtherApps: true)
-        newWindow.makeKeyAndOrderFront(nil)
-        newWindow.orderFrontRegardless()
+        NotificationCenter.default.post(name: NSNotification.Name("FaceIsland_OpenInIslandSettings"), object: nil)
+        IslandContentProvider.shared.expand(to: .faceID)
     }
 }

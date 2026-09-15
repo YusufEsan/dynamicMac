@@ -28,7 +28,7 @@ public struct AudioMixerModuleView: View {
             
             // Sliders Container (Scrollable after 5 rows)
             ScrollView(.vertical, showsIndicators: mixer.activeAppCount > 5) {
-                VStack(spacing: 7) {
+                VStack(spacing: 6) {
                     // 1. Ana Sistem Sesi (Master Volume) - Always present
                     volumeRow(
                         title: "Ana Sistem Sesi",
@@ -61,7 +61,6 @@ public struct AudioMixerModuleView: View {
                 }
                 .padding(.horizontal, 2)
             }
-            .frame(maxHeight: CGFloat(min(mixer.activeAppCount, 5) * 44))
         }
     }
     
@@ -117,7 +116,7 @@ public struct AudioMixerModuleView: View {
             }
         }
         .padding(.horizontal, 10)
-        .padding(.vertical, 5.5)
+        .padding(.vertical, 4.5)
         .background(Color.white.opacity(0.05))
         .clipShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
         .overlay(

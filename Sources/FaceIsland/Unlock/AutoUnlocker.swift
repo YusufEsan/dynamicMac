@@ -21,15 +21,23 @@ public final class AutoUnlocker {
     
     private func setupUnlockPipeline() {
         ScreenLockMonitor.shared.onScreenWake = { [weak self] in
-            self?.prepareIslandForLockOrWake()
-            guard let self = self, self.isAutoUnlockEnabled else { return }
+            guard let self = self, self.isAutoUnlockEnabled, ScreenLockMonitor.shared.isScreenLocked else { return }
+            self.prepareIslandForLockOrWake()
             self.triggerFaceScanForUnlock()
         }
         
         ScreenLockMonitor.shared.onScreenLocked = { [weak self] in
-            self?.prepareIslandForLockOrWake()
             guard let self = self, self.isAutoUnlockEnabled else { return }
+            self.prepareIslandForLockOrWake()
             self.triggerFaceScanForUnlock()
+        }
+        
+        ScreenLockMonitor.shared.onScreenUnlocked = {
+            FaceRecognitionManager.shared.stopRecognition()
+            DispatchQueue.main.async {
+                IslandWindowController.shared.window?.level = .statusBar
+                FloatingCapsuleController.shared.window?.level = .statusBar
+            }
         }
         
         NotificationCenter.default.addObserver(

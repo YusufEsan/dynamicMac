@@ -7,6 +7,7 @@ public final class FloatingCapsuleController {
     private var globalClickMonitor: Any?
     private var mouseMoveMonitor: Any?
     private var localMouseMoveMonitor: Any?
+    private var isRepositioning = false
     
     public var window: IslandPanel?
     
@@ -20,47 +21,6 @@ public final class FloatingCapsuleController {
                 FloatingCapsuleController.handleScreenClick()
             }
         }
-        if mouseMoveMonitor == nil {
-            mouseMoveMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.mouseMoved]) { [weak self] _ in
-                self?.updateMousePassthrough()
-            }
-        }
-        if localMouseMoveMonitor == nil {
-            localMouseMoveMonitor = NSEvent.addLocalMonitorForEvents(matching: [.mouseMoved]) { [weak self] event in
-                self?.updateMousePassthrough()
-                return event
-            }
-        }
-    }
-    
-    public func updateMousePassthrough() {
-        guard let window = self.window, window.isVisible, SettingsManager.shared.forceFloatingCapsule else { return }
-        let mouseLoc = NSEvent.mouseLocation
-        let windowFrame = window.frame
-        
-        let provider = IslandContentProvider.shared
-        let activeWidth: CGFloat = provider.currentVisualWidth
-        let activeHeight: CGFloat = provider.currentVisualHeight
-        let topOffset: CGFloat = 8
-        
-        let activeRect = CGRect(
-            x: windowFrame.origin.x + (windowFrame.width - activeWidth) / 2.0,
-            y: windowFrame.maxY - activeHeight - topOffset,
-            width: activeWidth,
-            height: activeHeight
-        )
-        
-        let isInside = activeRect.insetBy(dx: -4, dy: -4).contains(mouseLoc)
-        
-        if isInside {
-            if window.ignoresMouseEvents {
-                window.ignoresMouseEvents = false
-            }
-        } else {
-            if !window.ignoresMouseEvents {
-                window.ignoresMouseEvents = true
-            }
-        }
     }
     
     @discardableResult
@@ -68,25 +28,15 @@ public final class FloatingCapsuleController {
         guard let window = FloatingCapsuleController.shared.window, window.isVisible, SettingsManager.shared.forceFloatingCapsule else { return false }
         let mouseLoc = NSEvent.mouseLocation
         let windowFrame = window.frame
-        let provider = IslandContentProvider.shared
         
+        if windowFrame.insetBy(dx: -10, dy: -10).contains(mouseLoc) {
+            return false
+        }
+        
+        let provider = IslandContentProvider.shared
         if case .expanded = provider.expansionState {
-            let width: CGFloat = provider.currentVisualWidth
-            let height: CGFloat = provider.currentVisualHeight
-            let expandedRect = CGRect(
-                x: windowFrame.midX - (width / 2.0),
-                y: windowFrame.maxY - height - 8,
-                width: width,
-                height: height
-            )
-            if !expandedRect.contains(mouseLoc) {
-                DispatchQueue.main.async {
-                    withAnimation(AnimationConstants.islandMorphSpring) {
-                        provider.collapse()
-                    }
-                }
-                return true
-            }
+            provider.collapse()
+            return true
         }
         return false
     }
@@ -95,8 +45,10 @@ public final class FloatingCapsuleController {
     public func setupWindow() {
         guard window == nil else { return }
         
-        let canvasWidth: CGFloat = 780
-        let canvasHeight: CGFloat = 380
+        let provider = IslandContentProvider.shared
+        
+        let canvasWidth: CGFloat = max(provider.currentVisualWidth, 320)
+        let canvasHeight: CGFloat = max(provider.currentVisualHeight, 35)
         
         guard let screen = NSScreen.main ?? NSScreen.screens.first else { return }
         let screenFrame = screen.frame
@@ -111,7 +63,7 @@ public final class FloatingCapsuleController {
         )
         
         panel.isFloatingPanel = true
-        panel.level = NSWindow.Level(Int(CGWindowLevelForKey(.screenSaverWindow)) + 2)
+        panel.level = .statusBar
         panel.backgroundColor = .clear
         panel.isOpaque = false
         panel.hasShadow = false
@@ -123,14 +75,60 @@ public final class FloatingCapsuleController {
         panel.becomesKeyOnlyIfNeeded = false
         panel.acceptsMouseMovedEvents = true
         
-        panel.contentView = IslandHostingView(rootView: IslandView(isTopAttached: false), isTopAttached: false)
+        // Wrap hosting view in a plain NSView to prevent NSHostingView from
+        // auto-resizing the window (which causes recursive layout crashes).
+        let hostingView = IslandHostingView(rootView: IslandView(isTopAttached: false), isTopAttached: false)
+        let wrapper = IslandFlippedView(frame: NSRect(origin: .zero, size: NSSize(width: canvasWidth, height: canvasHeight)))
+        wrapper.wantsLayer = true
+        wrapper.layer?.backgroundColor = .clear
+        hostingView.frame = wrapper.bounds
+        hostingView.autoresizingMask = [.width, .height]
+        wrapper.addSubview(hostingView)
+        panel.contentView = wrapper
         
         self.window = panel
+        
+        IslandContentProvider.shared.onStateChanged = { [weak self] _ in
+            guard let self = self, !self.isRepositioning else { return }
+            DispatchQueue.main.async {
+                self.repositionWindow(animate: true)
+            }
+        }
+        
+        repositionWindow(animate: false)
+    }
+    
+    @MainActor
+    public func repositionWindow(animate: Bool = true) {
+        guard !isRepositioning else { return }
+        guard let window = self.window, let screen = NSScreen.main ?? NSScreen.screens.first else { return }
+        isRepositioning = true
+        defer { isRepositioning = false }
+        let provider = IslandContentProvider.shared
+        
+        let canvasWidth: CGFloat = max(provider.currentVisualWidth, 320)
+        let canvasHeight: CGFloat = max(provider.currentVisualHeight, 35)
+        let screenFrame = screen.frame
+        let x = screenFrame.midX - (canvasWidth / 2.0)
+        let y = screenFrame.maxY - 70 - canvasHeight
+        let targetFrame = NSRect(x: x, y: y, width: canvasWidth, height: canvasHeight)
+        
+        if animate && window.isVisible && (abs(window.frame.width - canvasWidth) > 1.0 || abs(window.frame.height - canvasHeight) > 1.0) {
+            NSAnimationContext.runAnimationGroup { context in
+                context.duration = 0.28
+                context.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
+                context.allowsImplicitAnimation = true
+                window.animator().setFrame(targetFrame, display: true)
+            }
+        } else {
+            window.setFrame(targetFrame, display: true)
+        }
     }
     
     public func show() {
         DispatchQueue.main.async {
             if self.window == nil { self.setupWindow() }
+            self.repositionWindow(animate: false)
             self.window?.orderFrontRegardless()
         }
     }

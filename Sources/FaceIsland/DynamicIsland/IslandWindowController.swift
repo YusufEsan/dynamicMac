@@ -15,8 +15,7 @@ public final class IslandWindowController {
     public static let shared = IslandWindowController()
     
     private var globalClickMonitor: Any?
-    private var mouseMoveMonitor: Any?
-    private var localMouseMoveMonitor: Any?
+    private var isRepositioning = false
     
     public var window: IslandPanel?
     
@@ -30,72 +29,22 @@ public final class IslandWindowController {
                 IslandWindowController.handleScreenClick()
             }
         }
-        if mouseMoveMonitor == nil {
-            mouseMoveMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.mouseMoved]) { [weak self] _ in
-                self?.updateMousePassthrough()
-            }
-        }
-        if localMouseMoveMonitor == nil {
-            localMouseMoveMonitor = NSEvent.addLocalMonitorForEvents(matching: [.mouseMoved]) { [weak self] event in
-                self?.updateMousePassthrough()
-                return event
-            }
-        }
-    }
-    
-    public func updateMousePassthrough() {
-        guard let window = self.window, window.isVisible, !SettingsManager.shared.forceFloatingCapsule else { return }
-        let mouseLoc = NSEvent.mouseLocation
-        let windowFrame = window.frame
-        
-        let provider = IslandContentProvider.shared
-        let activeWidth: CGFloat = provider.currentVisualWidth
-        let activeHeight: CGFloat = provider.currentVisualHeight
-        
-        let activeRect = CGRect(
-            x: windowFrame.origin.x + (windowFrame.width - activeWidth) / 2.0,
-            y: windowFrame.maxY - activeHeight,
-            width: activeWidth,
-            height: activeHeight
-        )
-        
-        let isInside = activeRect.insetBy(dx: -4, dy: -4).contains(mouseLoc)
-        
-        if isInside {
-            if window.ignoresMouseEvents {
-                window.ignoresMouseEvents = false
-            }
-        } else {
-            if !window.ignoresMouseEvents {
-                window.ignoresMouseEvents = true
-            }
-        }
     }
     
     @discardableResult
     public static func handleScreenClick() -> Bool {
         guard let window = IslandWindowController.shared.window, window.isVisible, !SettingsManager.shared.forceFloatingCapsule else { return false }
         let mouseLoc = NSEvent.mouseLocation
+        let windowFrame = window.frame
+        
+        if windowFrame.insetBy(dx: -10, dy: -10).contains(mouseLoc) {
+            return false
+        }
         
         let provider = IslandContentProvider.shared
         if case .expanded = provider.expansionState {
-            let windowFrame = window.frame
-            let expandedWidth: CGFloat = provider.currentVisualWidth
-            let expandedHeight: CGFloat = provider.currentVisualHeight
-            let expandedRect = CGRect(
-                x: windowFrame.origin.x + (windowFrame.width - expandedWidth) / 2.0,
-                y: windowFrame.maxY - expandedHeight,
-                width: expandedWidth,
-                height: expandedHeight
-            )
-            if !expandedRect.contains(mouseLoc) {
-                DispatchQueue.main.async {
-                    withAnimation(AnimationConstants.islandMorphSpring) {
-                        provider.collapse()
-                    }
-                }
-                return true
-            }
+            provider.collapse()
+            return true
         }
         return false
     }
@@ -104,8 +53,10 @@ public final class IslandWindowController {
     public func setupWindow() {
         guard window == nil else { return }
         
-        let canvasWidth: CGFloat = 780
-        let canvasHeight: CGFloat = 380
+        let provider = IslandContentProvider.shared
+        
+        let canvasWidth: CGFloat = max(provider.currentVisualWidth, 320)
+        let canvasHeight: CGFloat = max(provider.currentVisualHeight, 35)
         
         guard let screen = NSScreen.main ?? NSScreen.screens.first else { return }
         let screenFrame = screen.frame
@@ -120,7 +71,7 @@ public final class IslandWindowController {
         )
         
         panel.isFloatingPanel = true
-        panel.level = NSWindow.Level(Int(CGWindowLevelForKey(.screenSaverWindow)) + 2)
+        panel.level = .statusBar
         panel.backgroundColor = .clear
         panel.isOpaque = false
         panel.hasShadow = false
@@ -130,8 +81,16 @@ public final class IslandWindowController {
         panel.ignoresMouseEvents = false
         panel.becomesKeyOnlyIfNeeded = false
         panel.acceptsMouseMovedEvents = true
-        
-        panel.contentView = IslandHostingView(rootView: IslandView(isTopAttached: true), isTopAttached: true)
+        // Wrap hosting view in a flipped NSView to prevent NSHostingView from
+        // auto-resizing the window and to keep the top edge anchored to screen bezel.
+        let hostingView = IslandHostingView(rootView: IslandView(isTopAttached: true), isTopAttached: true)
+        let wrapper = IslandFlippedView(frame: NSRect(origin: .zero, size: NSSize(width: canvasWidth, height: canvasHeight)))
+        wrapper.wantsLayer = true
+        wrapper.layer?.backgroundColor = .clear
+        hostingView.frame = wrapper.bounds
+        hostingView.autoresizingMask = [.width, .height]
+        wrapper.addSubview(hostingView)
+        panel.contentView = wrapper
         
         self.window = panel
         
@@ -142,16 +101,28 @@ public final class IslandWindowController {
             object: nil
         )
         
-        repositionWindow()
+        IslandContentProvider.shared.onStateChanged = { [weak self] _ in
+            guard let self = self, !self.isRepositioning else { return }
+            DispatchQueue.main.async {
+                self.repositionWindow(animate: true)
+            }
+        }
+        
+        repositionWindow(animate: false)
     }
-    
-    private var slideTimer: Timer?
     
     @MainActor
     public func repositionWindow(animate: Bool = true) {
+        guard !isRepositioning else { return }
         guard let window = self.window, let screen = NSScreen.main ?? NSScreen.screens.first else { return }
-        let canvasWidth: CGFloat = 780
-        let canvasHeight: CGFloat = 380
+        isRepositioning = true
+        defer { isRepositioning = false }
+        let provider = IslandContentProvider.shared
+        
+        // Use the actual visual dimensions from SwiftUI (set by updateVisualDimensions).
+        // This handles all modes: compact, expanded dashboard, AND video player.
+        let canvasWidth: CGFloat = max(provider.currentVisualWidth, 320)
+        let canvasHeight: CGFloat = max(provider.currentVisualHeight, 35)
         let screenFrame = screen.frame
         
         let targetX: CGFloat
@@ -166,10 +137,10 @@ public final class IslandWindowController {
         let y = screenFrame.maxY - canvasHeight
         let targetFrame = NSRect(x: targetX, y: y, width: canvasWidth, height: canvasHeight)
         
-        if animate && window.isVisible && abs(window.frame.origin.x - targetX) > 1.0 {
+        if animate && window.isVisible && (abs(window.frame.origin.x - targetX) > 1.0 || abs(window.frame.width - canvasWidth) > 1.0 || abs(window.frame.height - canvasHeight) > 1.0) {
             NSAnimationContext.runAnimationGroup { context in
-                context.duration = 0.32
-                context.timingFunction = CAMediaTimingFunction(controlPoints: 0.175, 0.885, 0.32, 1.275)
+                context.duration = 0.28
+                context.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
                 context.allowsImplicitAnimation = true
                 window.animator().setFrame(targetFrame, display: true)
             }
@@ -187,7 +158,7 @@ public final class IslandWindowController {
     public func show() {
         DispatchQueue.main.async {
             if self.window == nil { self.setupWindow() }
-            self.repositionWindow()
+            self.repositionWindow(animate: false)
             self.window?.orderFrontRegardless()
         }
     }

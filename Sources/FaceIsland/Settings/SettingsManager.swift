@@ -116,6 +116,23 @@ public final class SettingsManager {
         }
     }
     
+    public var isWidgetSyncEnabled: Bool {
+        get {
+            if UserDefaults.standard.object(forKey: "FaceIsland_WidgetSyncEnabled") == nil {
+                return true
+            }
+            return UserDefaults.standard.bool(forKey: "FaceIsland_WidgetSyncEnabled")
+        }
+        set {
+            UserDefaults.standard.set(newValue, forKey: "FaceIsland_WidgetSyncEnabled")
+            if !newValue {
+                WidgetSharedState.shared.updateFaceIDState(isScanning: false, isRecognized: false, statusText: "Devre Dışı")
+            } else {
+                WidgetSharedState.shared.updateFaceIDState(isScanning: false, isRecognized: false, statusText: "Face ID Hazır")
+            }
+        }
+    }
+    
     private init() {
         FaceRecognitionManager.shared.recognitionThreshold = Float(faceIDThreshold)
     }

@@ -11,6 +11,9 @@ public final class ScreenLockMonitor {
     public var onScreenWake: (() -> Void)?
     
     private init() {
+        if let dict = CGSessionCopyCurrentDictionary() as? [String: Any] {
+            self.isScreenLocked = dict["CGSSessionScreenIsLocked"] as? Bool ?? false
+        }
         setupObservers()
     }
     
@@ -148,7 +151,10 @@ public final class ScreenLockMonitor {
     
     @objc private func screensaverStoppedReceived() {
         AppLogger.info("🖥️ Screensaver stopped / waking", category: .unlock)
-        onScreenWake?()
+        checkSystemLockState()
+        if isScreenLocked {
+            onScreenWake?()
+        }
     }
     
     @objc private func screenSleptReceived() {
@@ -159,7 +165,9 @@ public final class ScreenLockMonitor {
     @objc private func screenWokeReceived() {
         AppLogger.info("☀️ Screen wake detected", category: .unlock)
         checkSystemLockState()
-        onScreenWake?()
+        if isScreenLocked {
+            onScreenWake?()
+        }
     }
     
     @objc private func sessionResignedReceived() {
@@ -170,6 +178,9 @@ public final class ScreenLockMonitor {
     
     @objc private func sessionActiveReceived() {
         AppLogger.info("👤 User session became active", category: .unlock)
-        onScreenWake?()
+        checkSystemLockState()
+        if isScreenLocked {
+            onScreenWake?()
+        }
     }
 }

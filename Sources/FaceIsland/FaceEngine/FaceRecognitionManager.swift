@@ -76,6 +76,7 @@ public final class FaceRecognitionManager: NSObject, CameraManagerDelegate {
         consecutiveMatches = 0
         scanStartTime = Date()
         currentState = .scanning(progress: 0.1)
+        WidgetSharedState.shared.updateFaceIDState(isScanning: true, isRecognized: false, statusText: "Yüz Taranıyor...")
         
         CameraManager.shared.delegate = self
         CameraManager.shared.startCapture()
@@ -87,6 +88,7 @@ public final class FaceRecognitionManager: NSObject, CameraManagerDelegate {
         CameraManager.shared.stopCapture()
         if case .scanning = currentState {
             currentState = .idle
+            WidgetSharedState.shared.updateFaceIDState(isScanning: false, isRecognized: false, statusText: "Face ID Hazır")
         }
     }
     
@@ -98,11 +100,13 @@ public final class FaceRecognitionManager: NSObject, CameraManagerDelegate {
             DispatchQueue.main.async {
                 self.stopRecognition()
                 self.currentState = .notRecognized
+                WidgetSharedState.shared.updateFaceIDState(isScanning: false, isRecognized: false, statusText: "Yüz Tanınamadı")
                 self.onScanFailed?()
                 
                 DispatchQueue.main.asyncAfter(deadline: .now() + 6.0) {
                     if case .notRecognized = self.currentState {
                         self.currentState = .idle
+                        WidgetSharedState.shared.updateFaceIDState(isScanning: false, isRecognized: false, statusText: "Face ID Hazır")
                     }
                 }
             }
@@ -140,6 +144,7 @@ public final class FaceRecognitionManager: NSObject, CameraManagerDelegate {
                         if self.consecutiveMatches >= self.requiredConsecutiveMatches {
                             self.currentState = .recognized(confidence: maxScore)
                             self.stopRecognition()
+                            WidgetSharedState.shared.updateFaceIDState(isScanning: false, isRecognized: true, statusText: "Kilit Açıldı")
                             AppLogger.info("Face recognized with confidence: \(maxScore)", category: .faceID)
                             self.onFaceRecognized?(maxScore)
                             NotificationCenter.default.post(
@@ -151,6 +156,7 @@ public final class FaceRecognitionManager: NSObject, CameraManagerDelegate {
                             DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) {
                                 if case .recognized = self.currentState {
                                     self.currentState = .idle
+                                    WidgetSharedState.shared.updateFaceIDState(isScanning: false, isRecognized: false, statusText: "Face ID Hazır")
                                 }
                             }
                         } else {

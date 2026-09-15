@@ -7,31 +7,18 @@ struct FaceIslandApp: App {
     
     var body: some Scene {
         MenuBarExtra("FaceIsland", systemImage: "oval.portrait") {
-            Button("Toggle Dynamic Island") {
-                IslandContentProvider.shared.toggleExpand()
-            }
-            
-            Button("Alt+Tab Window Switcher") {
-                WindowSwitcherController.shared.show()
-            }
-            
-            Divider()
-            
-            Button("Settings...") {
-                SettingsWindowController.shared.show()
+            Button("Ayarlar...") {
+                NotificationCenter.default.post(name: NSNotification.Name("FaceIsland_OpenInIslandSettings"), object: nil)
+                IslandContentProvider.shared.expand(to: .faceID)
             }
             .keyboardShortcut(",", modifiers: .command)
             
             Divider()
             
-            Button("Quit FaceIsland") {
+            Button("Çıkış") {
                 NSApplication.shared.terminate(nil)
             }
             .keyboardShortcut("q", modifiers: .command)
-        }
-        
-        Settings {
-            SettingsView()
         }
     }
 }
@@ -57,13 +44,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             
             // Apply Island display style (Notch or Floating capsule)
             SettingsManager.shared.applyIslandDisplayMode()
-            
-            // On launch: only trigger Face ID unlock workflow if screen is locked
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
-                if ScreenLockMonitor.shared.isScreenLocked && FaceRecognitionManager.shared.isEnrolled {
-                    AutoUnlocker.shared.triggerFaceScanForUnlock()
-                }
-            }
         }
     }
     

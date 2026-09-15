@@ -16,9 +16,12 @@ public final class NowPlayingManager {
     private var basePosition: Double = 0.0
     private var lastTimestamp: Date = Date()
     private var playbackRate: Double = 0.0
+    public var tickCount: Int = 0
+    private var tickTimer: Timer?
     
     public var currentPosition: Double {
         get {
+            _ = tickCount
             if isPlaying {
                 let elapsedSinceUpdate = Date().timeIntervalSince(lastTimestamp)
                 let rate = playbackRate > 0 ? playbackRate : 1.0
@@ -136,15 +139,24 @@ public final class NowPlayingManager {
     
     public func startPolling() {
         pollTimer?.invalidate()
-        // Poll every 0.8s for smooth slider updates
-        pollTimer = Timer.scheduledTimer(withTimeInterval: 0.8, repeats: true) { [weak self] _ in
+        // Poll every 2.0s for lightweight state updates
+        pollTimer = Timer.scheduledTimer(withTimeInterval: 2.0, repeats: true) { [weak self] _ in
             self?.refreshPlaybackState()
+        }
+        
+        tickTimer?.invalidate()
+        // 1-second UI tick for smooth second-by-second progress
+        tickTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
+            guard let self = self, self.isPlaying else { return }
+            self.tickCount &+= 1
         }
     }
     
     public func stopPolling() {
         pollTimer?.invalidate()
         pollTimer = nil
+        tickTimer?.invalidate()
+        tickTimer = nil
     }
     
     public func refreshPlaybackState() {
@@ -165,7 +177,6 @@ public final class NowPlayingManager {
                     let trackDuration = dict["kMRMediaRemoteNowPlayingInfoDuration"] as? Double ?? 0.0
                     let trackElapsed = dict["kMRMediaRemoteNowPlayingInfoElapsedTime"] as? Double ?? 0.0
                     let rate = dict["kMRMediaRemoteNowPlayingInfoPlaybackRate"] as? Double ?? 0.0
-                    let infoTimestamp = dict["kMRMediaRemoteNowPlayingInfoTimestamp"] as? Date ?? Date()
                     let isMediaPlaying = (rate > 0)
                     
                     // Artwork data
@@ -189,17 +200,6 @@ public final class NowPlayingManager {
                         detectedApp = "Chrome"
                     }
                     
-                    // If MediaRemote reports Spotify/Music/Chrome as PAUSED, immediately check if Chrome has an active video playing!
-                    if !isMediaPlaying && self.isAppRunning("com.google.Chrome") {
-                        self.fetchChromeMediaState(mediaRemotePlaying: false)
-                        return
-                    }
-                    
-                    if (detectedApp == "Chrome" || detectedApp == "YouTube") && !isMediaPlaying {
-                        self.fetchChromeMediaState(mediaRemotePlaying: false)
-                        return
-                    }
-                    
                     DispatchQueue.main.async {
                         self.isPlaying = isMediaPlaying
                         self.title = trackTitle
@@ -207,15 +207,12 @@ public final class NowPlayingManager {
                         self.album = trackAlbum.isEmpty && detectedApp == "Chrome" ? "Web Medya" : trackAlbum
                         self.duration = trackDuration
                         self.basePosition = trackElapsed
-                        self.lastTimestamp = infoTimestamp
+                        self.lastTimestamp = Date()
                         self.playbackRate = isMediaPlaying ? (rate > 0 ? rate : 1.0) : 0.0
                         self.activePlayerName = detectedApp
                         
                         if let img = newImage {
                             self.artwork = img
-                        } else if detectedApp == "Chrome" {
-                            // Fetch Chrome tab URL / Favicon / JS stats
-                            self.fetchChromeMediaState(mediaRemotePlaying: isMediaPlaying)
                         } else if self.artwork == nil {
                             self.fetchArtworkIfNeeded(title: trackTitle, artist: trackArtist)
                         }
@@ -231,7 +228,7 @@ public final class NowPlayingManager {
     }
     
     private func fallbackAppleScriptCheck() {
-        defer { self.isFetching = false }
+        // Note: isFetching is reset in the individual fetch methods' callbacks
         
         // 1. Spotify
         if isAppRunning("com.spotify.client") {
@@ -246,6 +243,7 @@ public final class NowPlayingManager {
             fetchChromeMediaState(mediaRemotePlaying: false)
         } else {
             resetToStopped()
+            self.isFetching = false
         }
     }
     
@@ -269,12 +267,11 @@ public final class NowPlayingManager {
     }
     
     private func fetchChromeMediaState(mediaRemotePlaying: Bool = true) {
-        let jsCode = "(() => { function parseT(t) { if (!t) return 0; let p = t.trim().split(':'); if (p.length === 3) return (+p[0])*3600 + (+p[1])*60 + (+p[2]); if (p.length === 2) return (+p[0])*60 + (+p[1]); return +t || 0; } let videos = Array.from(document.querySelectorAll('video, audio')); document.querySelectorAll('iframe').forEach(f => { try { if (f.contentDocument) { videos = videos.concat(Array.from(f.contentDocument.querySelectorAll('video, audio'))); } } catch(e) {} }); for (let v of videos) { if (!v.paused && v.duration && v.duration > 0 && !isNaN(v.duration)) { return Math.floor(v.currentTime) + '|||' + Math.floor(v.duration) + '|||1'; } } for (let v of videos) { if (v.paused && v.duration && v.duration > 0) { return Math.floor(v.currentTime) + '|||' + Math.floor(v.duration) + '|||0'; } } return ''; })()"
+        let jsCode = "(() => { let v = document.querySelector('video, audio'); if (v && !v.paused && v.duration > 0) { return Math.floor(v.currentTime) + '|||' + Math.floor(v.duration) + '|||1'; } if (v && v.paused && v.duration > 0) { return Math.floor(v.currentTime) + '|||' + Math.floor(v.duration) + '|||0'; } return ''; })()"
         
         let script = """
         tell application "Google Chrome"
             if it is running then
-                -- 1. Check active tab of front window
                 try
                     set frontWin to front window
                     set curTab to active tab of frontWin
@@ -290,29 +287,18 @@ public final class NowPlayingManager {
                         end if
                     end if
                 end try
-                -- 2. Check active video in any media tab
-                try
-                    repeat with w in windows
-                        repeat with t in tabs of w
-                            try
-                                set u to URL of t
-                                if u contains "youtube.com/watch" or u contains "youtube.com/shorts" or u contains "twitch.tv" or u contains "spotify.com" or u contains "soundcloud.com" or u contains "netflix.com" or u contains "myasian" then
-                                    set vStats to execute t javascript "\(jsCode)"
-                                    if vStats is not "" and vStats ends with "1" then
-                                        return "stats|||" & (title of t) & "|||" & u & "|||" & vStats
-                                    end if
-                                end if
-                            end try
-                        end repeat
-                    end repeat
-                end try
             end if
             return "stopped"
         end tell
         """
         executeAppleScript(script) { [weak self] result in
-            guard let self = self, let result = result else { return }
+            guard let self = self else { return }
+            guard let result = result else {
+                DispatchQueue.main.async { self.isFetching = false }
+                return
+            }
             self.handleBrowserResult(result: result, browserName: "Chrome", mediaRemotePlaying: mediaRemotePlaying)
+            DispatchQueue.main.async { self.isFetching = false }
         }
     }
     
@@ -551,9 +537,14 @@ public final class NowPlayingManager {
         """
         
         executeAppleScript(script) { [weak self] result in
-            guard let self = self, let result = result else { return }
+            guard let self = self else { return }
+            guard let result = result else {
+                DispatchQueue.main.async { self.isFetching = false }
+                return
+            }
             let parts = result.components(separatedBy: "|||")
             DispatchQueue.main.async {
+                defer { self.isFetching = false }
                 if parts.count >= 6 && parts[0] == "playing" {
                     let newTitle = parts[1]
                     let newArtist = parts[2]
@@ -604,9 +595,14 @@ public final class NowPlayingManager {
         end tell
         """
         executeAppleScript(script) { [weak self] result in
-            guard let self = self, let result = result else { return }
+            guard let self = self else { return }
+            guard let result = result else {
+                DispatchQueue.main.async { self.isFetching = false }
+                return
+            }
             let parts = result.components(separatedBy: "|||")
             DispatchQueue.main.async {
+                defer { self.isFetching = false }
                 if parts.count >= 6 && parts[0] == "playing" {
                     let newTitle = parts[1]
                     let newArtist = parts[2]
@@ -715,16 +711,18 @@ public final class NowPlayingManager {
     }
     
     private func executeAppleScript(_ source: String, completion: @escaping (String?) -> Void) {
-        var error: NSDictionary?
-        if let scriptObject = NSAppleScript(source: source) {
-            let output = scriptObject.executeAndReturnError(&error)
-            if error == nil {
-                completion(output.stringValue)
+        DispatchQueue.global(qos: .userInitiated).async {
+            var error: NSDictionary?
+            if let scriptObject = NSAppleScript(source: source) {
+                let output = scriptObject.executeAndReturnError(&error)
+                if error == nil {
+                    completion(output.stringValue)
+                } else {
+                    completion(nil)
+                }
             } else {
                 completion(nil)
             }
-        } else {
-            completion(nil)
         }
     }
     
@@ -931,7 +929,8 @@ public final class NowPlayingManager {
     }
     
     public var formattedPosition: String {
-        Self.formatTime(currentPosition)
+        _ = tickCount
+        return Self.formatTime(currentPosition)
     }
     
     public var formattedDuration: String {

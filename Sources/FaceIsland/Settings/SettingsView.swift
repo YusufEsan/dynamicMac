@@ -1,14 +1,14 @@
 import SwiftUI
 
 public enum SettingsTab: String, CaseIterable, Identifiable {
-    case general = "General"
-    case permissions = "Permissions"
+    case general = "Genel"
+    case permissions = "İzinler"
     case faceID = "Face ID"
-    case island = "Dynamic Island"
-    case audio = "Audio"
-    case clipboard = "Clipboard"
-    case switcher = "Window Switcher"
-    case security = "Security"
+    case island = "Dinamik Ada"
+    case audio = "Ses Karıştırıcı"
+    case clipboard = "Pano Geçmişi"
+    case switcher = "Pencere Yöneticisi"
+    case security = "Güvenlik & Kasa"
     
     public var id: String { rawValue }
     
@@ -32,7 +32,7 @@ public struct SettingsView: View {
     private var permissions = PermissionManager.shared
     @Bindable private var clipboardManager = ClipboardManager.shared
     
-    @State private var selectedTab: SettingsTab = .general
+    @State private var selectedTab: SettingsTab = .permissions
     @State private var showEnrollmentSheet = false
     @State private var unlockPasswordInput = ""
     @State private var passwordSaveStatus = ""
@@ -46,7 +46,7 @@ public struct SettingsView: View {
                     Label(tab.rawValue, systemImage: tab.iconName)
                 }
             }
-            .navigationSplitViewColumnWidth(min: 160, ideal: 190, max: 220)
+            .navigationSplitViewColumnWidth(min: 170, ideal: 200, max: 230)
         } detail: {
             Group {
                 switch selectedTab {
@@ -68,7 +68,7 @@ public struct SettingsView: View {
                     securitySettingsView
                 }
             }
-            .frame(minWidth: 460, minHeight: 400)
+            .frame(minWidth: 480, minHeight: 440)
             .padding(24)
         }
         .sheet(isPresented: $showEnrollmentSheet) {
@@ -82,15 +82,15 @@ public struct SettingsView: View {
     // MARK: - General Tab
     private var generalSettingsView: some View {
         Form {
-            Section("System & Startup") {
-                Toggle("Launch FaceIsland at Login", isOn: $settings.launchAtLogin)
+            Section("Sistem & Başlangıç") {
+                Toggle("Mac Başlangıcında Otomatik Başlat", isOn: $settings.launchAtLogin)
             }
             
-            Section("Permissions Quick Overview") {
+            Section("İzin Özeti") {
                 HStack {
-                    Text("System Permissions Status")
+                    Text("Tüm Sistem İzinlerini Yönet")
                     Spacer()
-                    Button("Manage All Permissions...") {
+                    Button("İzinler Sayfasına Git...") {
                         selectedTab = .permissions
                     }
                 }
@@ -100,12 +100,12 @@ public struct SettingsView: View {
     
     // MARK: - Dedicated Permissions Tab
     private var permissionsSettingsView: some View {
-        VStack(alignment: .leading, spacing: 18) {
+        VStack(alignment: .leading, spacing: 16) {
             HStack {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("Sistem İzinleri (Permissions)")
                         .font(.title2.bold())
-                    Text("FaceIsland'ın tüm özelliklerinin eksiksiz çalışması için gerekli sistem izinleri:")
+                    Text("FaceIsland'ın tüm özelliklerinin eksiksiz çalışabilmesi için gerekli sistem izinleri:")
                         .font(.subheadline)
                         .foregroundColor(.secondary)
                 }
@@ -124,7 +124,7 @@ public struct SettingsView: View {
                     // 1. Camera
                     permissionRow(
                         title: "Kamera (FaceTime HD)",
-                        description: "Face ID ile yüz tanıma ve otomatik kilit açma için kullanılır.",
+                        description: "Face ID ile yüz tanıma ve ekran kilidini otomatik açmak için kullanılır.",
                         icon: "camera.fill",
                         isGranted: permissions.cameraGranted,
                         onGrant: {
@@ -138,7 +138,7 @@ public struct SettingsView: View {
                     // 2. Accessibility
                     permissionRow(
                         title: "Erişilebilirlik (Accessibility)",
-                        description: "⌥+Tab pencere değiştirici ve klavye kısayolları için gereklidir.",
+                        description: "Alt+Tab pencere değiştirici, fare tıklama geçirgenliği ve kısayollar için gereklidir.",
                         icon: "hand.raised.fill",
                         isGranted: permissions.accessibilityGranted,
                         onGrant: {
@@ -152,7 +152,7 @@ public struct SettingsView: View {
                     // 3. Screen Recording
                     permissionRow(
                         title: "Ekran Kaydı (Screen Recording)",
-                        description: "Çentikte canlı YouTube/web video oynatıcı ve pencere önizlemeleri için gereklidir.",
+                        description: "Çentikte canlı video oynatıcı ve açık pencerelerin anlık önizlemeleri için gereklidir.",
                         icon: "display",
                         isGranted: permissions.screenRecordingGranted,
                         onGrant: {
@@ -166,7 +166,7 @@ public struct SettingsView: View {
                     // 4. Calendar
                     permissionRow(
                         title: "Takvim Erişimi (Calendar)",
-                        description: "Dinamik Ada üzerinde yaklaşan etkinlikleri ve geri sayımı gösterir.",
+                        description: "Dinamik Ada üzerinde yaklaşan etkinlikleri ve canlı geri sayımı gösterir.",
                         icon: "calendar",
                         isGranted: permissions.calendarGranted,
                         onGrant: {
@@ -192,7 +192,7 @@ public struct SettingsView: View {
     ) -> some View {
         HStack(spacing: 14) {
             Image(systemName: icon)
-                .font(.system(size: 18))
+                .font(.system(size: 17))
                 .foregroundColor(isGranted ? .green : .orange)
                 .frame(width: 32, height: 32)
                 .background((isGranted ? Color.green : Color.orange).opacity(0.12))
@@ -243,36 +243,43 @@ public struct SettingsView: View {
     // MARK: - Face ID Tab
     private var faceIDSettingsView: some View {
         Form {
-            Section("Face Recognition Profile") {
+            Section("Face ID Biyometri Profili") {
                 HStack {
                     VStack(alignment: .leading, spacing: 3) {
-                        Text(faceRecognition.isEnrolled ? "Face ID Enrolled" : "No Face Enrolled")
+                        Text(faceRecognition.isEnrolled ? "Face ID Profili Aktif" : "Kayıtlı Yüz Bulunamadı")
                             .font(.headline)
-                        Text(faceRecognition.isEnrolled ? "Trained on FaceTime HD camera" : "Set up your face to enable unlock")
+                        Text(faceRecognition.isEnrolled ? "FaceTime HD kamerasıyla eğitildi" : "Kilit açmak için yüzünüzü kaydedin")
                             .font(.caption)
                             .foregroundColor(.secondary)
                     }
                     Spacer()
-                    Button(faceRecognition.isEnrolled ? "Re-enroll Face" : "Enroll Face") {
+                    Button(faceRecognition.isEnrolled ? "Yeniden Eğit" : "Yüzü Tanıt") {
                         showEnrollmentSheet = true
                     }
                     .buttonStyle(.borderedProminent)
                 }
             }
             
-            Section("Sensitivity & Matching") {
+            Section("Eşleşme Hassasiyeti") {
                 VStack(alignment: .leading) {
                     HStack {
-                        Text("Recognition Confidence Threshold")
+                        Text("Yüz Eşleşme Güven Eşiği")
                         Spacer()
-                        Text("\(Int(settings.faceIDThreshold * 100))%")
+                        Text("%\(Int(settings.faceIDThreshold * 100))")
                             .bold()
                     }
                     Slider(value: $settings.faceIDThreshold, in: 0.60...0.95, step: 0.02)
-                    Text("Higher values increase security; lower values allow faster recognition in dim lighting.")
+                    Text("Yüksek değerler güvenliği artırır; düşük değerler loş ışıkta daha hızlı tanır.")
                         .font(.caption2)
                         .foregroundColor(.secondary)
                 }
+            }
+            
+            Section("Widget & Ekran Entegrasyonu") {
+                Toggle("Face ID Widget Senkronizasyonu", isOn: $settings.isWidgetSyncEnabled)
+                Text("Masaüstü ve kilit ekranı widget'ına anlık yüz tarama animasyonu ve durumunu iletir.")
+                    .font(.caption2)
+                    .foregroundColor(.secondary)
             }
         }
     }
@@ -287,7 +294,6 @@ public struct SettingsView: View {
                 }
                 .pickerStyle(.radioGroup)
                 
-                // Çentik Konumu (Sol / Orta / Sağ) - Sadece Çentik Adası seçeneği aktifken
                 VStack(alignment: .leading, spacing: 6) {
                     HStack {
                         Text("Çentik Konumu (Hizalama)")
@@ -319,12 +325,12 @@ public struct SettingsView: View {
                 }
             }
             
-            Section("Preview & Actions") {
-                Button("Toggle Island Expansion") {
+            Section("Önizleme & İşlemler") {
+                Button("Dinamik Adayı Genişlet / Kapat") {
                     IslandContentProvider.shared.toggleExpand()
                 }
                 
-                Button("Bring Floating Capsule to Center") {
+                Button("Yüzen Kapsülü Ekrana Getir") {
                     FloatingCapsuleController.shared.show()
                 }
             }
@@ -334,12 +340,12 @@ public struct SettingsView: View {
     // MARK: - Audio Tab
     private var audioSettingsView: some View {
         Form {
-            Section("Per-App Volume Controller") {
-                Text("FaceIsland automatically detects running media players, browsers, and voice apps.")
+            Section("Uygulama Ses Karıştırıcısı") {
+                Text("FaceIsland çalışan medya oynatıcıları, tarayıcıları ve sesli uygulamaları otomatik algılar.")
                     .font(.caption)
                     .foregroundColor(.secondary)
                 
-                Button("Scan Running Audio Apps Now") {
+                Button("Açık Ses Veren Uygulamaları Tara") {
                     AppAudioManager.shared.refreshActiveApps()
                 }
             }
@@ -349,27 +355,27 @@ public struct SettingsView: View {
     // MARK: - Clipboard Tab
     private var clipboardSettingsView: some View {
         Form {
-            Section("History & Retention") {
-                Picker("Retention Period", selection: $settings.clipboardRetentionDays) {
-                    Text("1 Day").tag(1)
-                    Text("3 Days").tag(3)
-                    Text("7 Days").tag(7)
-                    Text("14 Days").tag(14)
-                    Text("30 Days").tag(30)
+            Section("Geçmiş & Saklama Süresi") {
+                Picker("Saklama Süresi", selection: $settings.clipboardRetentionDays) {
+                    Text("1 Gün").tag(1)
+                    Text("3 Gün").tag(3)
+                    Text("7 Gün (Önerilen)").tag(7)
+                    Text("14 Gün").tag(14)
+                    Text("30 Gün").tag(30)
                 }
                 
-                Text("Items older than this limit (except pinned items) are automatically purged.")
+                Text("Bu süreden eski kopyalanan veriler otomatik olarak temizlenir.")
                     .font(.caption2)
                     .foregroundColor(.secondary)
             }
             
-            Section("iCloud Sync") {
+            Section("iCloud Eşzamanlama") {
                 HStack {
-                    Text("iCloud Clipboard Status")
+                    Text("iCloud Pano Durumu")
                     Spacer()
-                    Text("Enabled (Universal)").foregroundColor(.green)
+                    Text("Devrede (Evrensel Pano)").foregroundColor(.green)
                 }
-                Text("Syncs clipboard between iPhone and Mac seamlessly without requiring a phone companion app.")
+                Text("iPhone ve Mac arasında kopyalanan metinleri senkronize eder.")
                     .font(.caption2)
                     .foregroundColor(.secondary)
             }
@@ -379,14 +385,14 @@ public struct SettingsView: View {
     // MARK: - Window Switcher Tab
     private var switcherSettingsView: some View {
         Form {
-            Section("Alt + Tab Window Grid") {
+            Section("Alt + Tab Pencere Tablosu") {
                 HStack {
-                    Text("Activation Shortcut")
+                    Text("Aktivasyon Kısayolu")
                     Spacer()
                     HotkeyRecorderView(hotkeyString: $settings.switcherHotkey)
                 }
                 
-                Button("Preview Switcher Overlay") {
+                Button("Pencere Değiştiriciyi Önizle") {
                     WindowSwitcherController.shared.show()
                 }
             }
@@ -396,31 +402,31 @@ public struct SettingsView: View {
     // MARK: - Security Tab
     private var securitySettingsView: some View {
         Form {
-            Section("Automatic Screen Unlock") {
-                Toggle("Unlock Mac with Face ID on Screen Wake", isOn: $settings.autoUnlockEnabled)
+            Section("Otomatik Ekran Kilidi Açma") {
+                Toggle("Ekran Uyanışında Face ID ile Mac Kilidini Aç", isOn: $settings.autoUnlockEnabled)
                 
                 VStack(alignment: .leading, spacing: 8) {
-                    Text("Store Session Unlock Key in Secure Keychain")
+                    Text("Oturum Açma Anahtarını Güvenli Anahtar Zincirinde (Keychain) Sakla")
                         .font(.subheadline)
                         .bold()
                     
-                    SecureField("Mac User Password", text: $unlockPasswordInput)
+                    SecureField("Mac Kullanıcı Şifresi", text: $unlockPasswordInput)
                         .textFieldStyle(.roundedBorder)
                     
                     HStack {
-                        Button("Save to Keychain") {
+                        Button("Anahtar Zincirine Kaydet") {
                             if !unlockPasswordInput.isEmpty {
                                 let success = KeychainHelper.shared.savePassword(unlockPasswordInput)
-                                passwordSaveStatus = success ? "Saved securely in Keychain!" : "Failed to save"
+                                passwordSaveStatus = success ? "AES-256 ile güvenle kaydedildi!" : "Kaydedilemedi"
                                 unlockPasswordInput = ""
                             }
                         }
                         .buttonStyle(.borderedProminent)
                         
                         if KeychainHelper.shared.hasSavedPassword {
-                            Button("Remove Password") {
+                            Button("Şifreyi Sil") {
                                 KeychainHelper.shared.deletePassword()
-                                passwordSaveStatus = "Password deleted."
+                                passwordSaveStatus = "Şifre silindi."
                             }
                             .buttonStyle(.bordered)
                         }

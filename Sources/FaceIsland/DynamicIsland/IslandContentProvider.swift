@@ -33,15 +33,26 @@ public final class IslandContentProvider {
     
     public var expansionState: IslandExpansionState = .compact {
         didSet {
-            print("🚀 [FaceIsland State Change] expansionState changed from \(oldValue) -> \(expansionState)")
             onStateChanged?(expansionState)
         }
     }
     public var activeModule: IslandModuleType = .faceID
     public var isHovered: Bool = false
     public var isPinnedExpanded: Bool = false
-    public var currentVisualWidth: CGFloat = 320
-    public var currentVisualHeight: CGFloat = 35
+    public var currentVisualWidth: CGFloat = 320 {
+        didSet {
+            if abs(currentVisualWidth - oldValue) > 1.0 {
+                onStateChanged?(expansionState)
+            }
+        }
+    }
+    public var currentVisualHeight: CGFloat = 35 {
+        didSet {
+            if abs(currentVisualHeight - oldValue) > 1.0 {
+                onStateChanged?(expansionState)
+            }
+        }
+    }
     
     public var onStateChanged: ((IslandExpansionState) -> Void)?
     
@@ -73,6 +84,12 @@ public final class IslandContentProvider {
             self.activeModule = module
             self.expansionState = .expanded(module)
         }
+    }
+    
+    public func expand(to module: IslandModuleType = .faceID) {
+        self.activeModule = module
+        self.isPinnedExpanded = true
+        self.expansionState = .expanded(module)
     }
     
     public func collapse() {

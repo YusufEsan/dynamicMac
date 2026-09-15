@@ -120,6 +120,7 @@ public struct ClipboardModuleView: View {
                 .frame(height: displayedItems.count <= 4 ? 74 : 154)
             }
         }
+        .frame(maxWidth: .infinity, alignment: .top)
     }
     
     // MARK: - Clipboard Card Component
