@@ -86,7 +86,7 @@ public final class NowPlayingManager {
     private var isFetching = false
     private var lastArtworkQuery: String = ""
     private var artworkCache: [String: NSImage] = [:]
-    private var lastActiveUrl: String = ""
+    public var lastActiveUrl: String = ""
     private var youtubeDurationCache: [String: Double] = [:]
     
     private init() {
@@ -309,6 +309,7 @@ public final class NowPlayingManager {
                 }
                 
                 let urlString = parts[2]
+                self.lastActiveUrl = urlString
                 let isYT = urlString.contains("youtube.com") || parts[1].contains("YouTube")
                 let rawCurr = parts[3].trimmingCharacters(in: .whitespacesAndNewlines)
                 let rawDur = parts[4].trimmingCharacters(in: .whitespacesAndNewlines)
@@ -668,11 +669,30 @@ public final class NowPlayingManager {
     
     // MARK: - Playback Controls
     public func togglePlayPause() {
-        if let sendCommand = sendCommandFn {
-            // kMRTogglePlayPause = 2
-            _ = sendCommand(2, nil)
+        if isSpotify {
+            let script = "tell application \"Spotify\" to playpause"
+            DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+                self?.executeAppleScript(script) { _ in }
+            }
+        } else if activePlayerName == "Music" {
+            let script = "tell application \"Music\" to playpause"
+            DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+                self?.executeAppleScript(script) { _ in }
+            }
+        } else {
+            let script = """
+            tell application "Google Chrome"
+                if it is running then
+                    try
+                        execute front window's active tab javascript "(() => { const btn = document.querySelector('.ytp-play-button'); if (btn) { btn.click(); return; } const v = document.querySelector('video.html5-main-video') || document.querySelector('video'); if (v) { if (v.paused) v.play(); else v.pause(); } })()"
+                    end try
+                end if
+            end tell
+            """
+            DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+                self?.executeAppleScript(script) { _ in }
+            }
         }
-        Self.postHardwareMediaKey(keyCode: 16) // NX_KEYTYPE_PLAY
         
         DispatchQueue.main.async {
             self.isPlaying.toggle()
@@ -684,12 +704,69 @@ public final class NowPlayingManager {
         }
     }
     
+    public func skipForward10() {
+        let script = """
+        tell application "Google Chrome"
+            if it is running then
+                try
+                    execute front window's active tab javascript "(() => { const v = document.querySelector('video.html5-main-video') || document.querySelector('video'); if (v) { v.currentTime = Math.min(v.duration || 999999, v.currentTime + 10); } })()"
+                end try
+            end if
+        end tell
+        """
+        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+            self?.executeAppleScript(script) { _ in }
+        }
+        DispatchQueue.main.async {
+            self.basePosition = min(self.duration > 0 ? self.duration : 999999, self.currentPosition + 10)
+            self.lastTimestamp = Date()
+        }
+    }
+    
+    public func skipBackward10() {
+        let script = """
+        tell application "Google Chrome"
+            if it is running then
+                try
+                    execute front window's active tab javascript "(() => { const v = document.querySelector('video.html5-main-video') || document.querySelector('video'); if (v) { v.currentTime = Math.max(0, v.currentTime - 10); } })()"
+                end try
+            end if
+        end tell
+        """
+        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+            self?.executeAppleScript(script) { _ in }
+        }
+        DispatchQueue.main.async {
+            self.basePosition = max(0, self.currentPosition - 10)
+            self.lastTimestamp = Date()
+        }
+    }
+    
     public func nextTrack() {
         if let sendCommand = sendCommandFn {
             // kMRNextTrack = 4
             _ = sendCommand(4, nil)
         }
         Self.postHardwareMediaKey(keyCode: 19) // NX_KEYTYPE_FAST
+        
+        if isSpotify {
+            let script = "tell application \"Spotify\" to next track"
+            DispatchQueue.global(qos: .userInitiated).async { [weak self] in self?.executeAppleScript(script) { _ in } }
+        } else if activePlayerName == "Music" {
+            let script = "tell application \"Music\" to next track"
+            DispatchQueue.global(qos: .userInitiated).async { [weak self] in self?.executeAppleScript(script) { _ in } }
+        } else {
+            let script = """
+            tell application "Google Chrome"
+                if it is running then
+                    try
+                        execute front window's active tab javascript "(() => { const btn = document.querySelector('.ytp-next-button'); if (btn) btn.click(); else { const v = document.querySelector('video'); if (v) v.currentTime += 10; } })()"
+                    end try
+                end if
+            end tell
+            """
+            DispatchQueue.global(qos: .userInitiated).async { [weak self] in self?.executeAppleScript(script) { _ in } }
+        }
         
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
             self.refreshPlaybackState()
@@ -703,6 +780,25 @@ public final class NowPlayingManager {
         }
         Self.postHardwareMediaKey(keyCode: 20) // NX_KEYTYPE_REWIND
         
+        if isSpotify {
+            let script = "tell application \"Spotify\" to previous track"
+            DispatchQueue.global(qos: .userInitiated).async { [weak self] in self?.executeAppleScript(script) { _ in } }
+        } else if activePlayerName == "Music" {
+            let script = "tell application \"Music\" to previous track"
+            DispatchQueue.global(qos: .userInitiated).async { [weak self] in self?.executeAppleScript(script) { _ in } }
+        } else {
+            let script = """
+            tell application "Google Chrome"
+                if it is running then
+                    try
+                        execute front window's active tab javascript "(() => { const btn = document.querySelector('.ytp-prev-button'); if (btn) btn.click(); else { const v = document.querySelector('video'); if (v) v.currentTime -= 10; } })()"
+                    end try
+                end if
+            end tell
+            """
+            DispatchQueue.global(qos: .userInitiated).async { [weak self] in self?.executeAppleScript(script) { _ in } }
+        }
+        
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
             self.refreshPlaybackState()
         }
@@ -711,6 +807,8 @@ public final class NowPlayingManager {
     public func seek(to position: Double) {
         let pos = max(0, min(duration > 0 ? duration : 3600.0, position))
         self.currentPosition = pos
+        self.basePosition = pos
+        self.lastTimestamp = Date()
         
         if let setElapsedTime = setElapsedTimeFn {
             setElapsedTime(pos)
@@ -732,12 +830,12 @@ public final class NowPlayingManager {
             DispatchQueue.global(qos: .userInitiated).async { [weak self] in
                 self?.executeAppleScript(script) { _ in }
             }
-        } else if activePlayerName == "Chrome" || activePlayerName == "YouTube" {
+        } else {
             let script = """
             tell application "Google Chrome"
                 if it is running then
                     try
-                        execute active tab of front window javascript "let v = document.querySelector('video'); if (v) v.currentTime = \(pos);"
+                        execute front window's active tab javascript "(() => { const v = document.querySelector('video.html5-main-video') || document.querySelector('video'); if (v) v.currentTime = \(pos); })()"
                     end try
                 end if
             end tell

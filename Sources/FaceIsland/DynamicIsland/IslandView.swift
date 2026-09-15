@@ -1,13 +1,13 @@
 import SwiftUI
 
 public struct IslandView: View {
-    @Bindable private var provider = IslandContentProvider.shared
-    @Bindable private var music = NowPlayingManager.shared
-    @Bindable private var faceRecognition = FaceRecognitionManager.shared
-    @Bindable private var calendarManager = CalendarManager.shared
-    @Bindable private var settings = SettingsManager.shared
-    @Bindable private var keychain = KeychainHelper.shared
-    @Bindable private var battery = BatteryManager.shared
+    private var provider = IslandContentProvider.shared
+    private var music = NowPlayingManager.shared
+    private var faceRecognition = FaceRecognitionManager.shared
+    private var calendarManager = CalendarManager.shared
+    private var settings = SettingsManager.shared
+    private var keychain = KeychainHelper.shared
+    private var battery = BatteryManager.shared
     private var permissions = PermissionManager.shared
     
     @State private var isHovering = false
@@ -17,6 +17,7 @@ public struct IslandView: View {
     @State private var unlockPasswordInput: String = ""
     @State private var passwordSaveStatus: String = ""
     @State private var isEditingPassword: Bool = false
+    @State private var isShowingSettingsInVideoMode: Bool = false
     
     // Animation States
     @State private var equalizerBars: [CGFloat] = [0.4, 0.9, 0.6, 0.8, 0.3]
@@ -30,6 +31,7 @@ public struct IslandView: View {
     }
     
     public var body: some View {
+        @Bindable var settings = settings
         VStack(spacing: 0) {
             ZStack {
                 // Pitch Black Card Background with subtle frosted stroke & liquid glow (No top edge stroke)
@@ -40,27 +42,27 @@ public struct IslandView: View {
                             .stroke(
                                 LinearGradient(
                                     colors: [
-                                        Color.white.opacity(isExpanded ? 0.32 : 0.20),
+                                        Color.white.opacity(isExpanded ? 0.25 : 0.20),
                                         Color.green.opacity(faceRecognition.isRecognized ? 0.85 : 0.0),
                                         Color.cyan.opacity(faceRecognition.isScanning ? 0.75 : 0.05),
-                                        music.themeColor.opacity(music.isPlaying ? 0.40 : 0.0),
-                                        Color.blue.opacity(0.22)
+                                        music.themeColor.opacity(music.isPlaying && !isVideoPlayerActive ? 0.40 : 0.0),
+                                        Color.blue.opacity(isVideoPlayerActive ? 0.0 : 0.15)
                                     ],
                                     startPoint: .topLeading,
                                     endPoint: .bottomTrailing
                                 ),
-                                lineWidth: faceRecognition.isRecognized || faceRecognition.isScanning ? 1.6 : 1.2
+                                lineWidth: faceRecognition.isRecognized || faceRecognition.isScanning ? 1.6 : 1.0
                             )
                     )
                     .shadow(
-                        color: faceRecognition.isRecognized ? Color(red: 0.11, green: 0.84, blue: 0.38).opacity(0.60) : (faceRecognition.isScanning ? Color.cyan.opacity(0.45) : (music.isPlaying ? music.themeColor.opacity(0.30) : Color.black.opacity(0.85))),
+                        color: faceRecognition.isRecognized ? Color(red: 0.11, green: 0.84, blue: 0.38).opacity(0.60) : (faceRecognition.isScanning ? Color.cyan.opacity(0.45) : (music.isPlaying && !isVideoPlayerActive ? music.themeColor.opacity(0.30) : Color.black.opacity(0.85))),
                         radius: isExpanded ? 28 : (faceRecognition.isRecognized || faceRecognition.isScanning ? 18 : 10),
                         x: 0,
                         y: isExpanded ? 10 : 2
                     )
                 
                 // Ambient Radial Glow when Music is Playing or Face ID Recognized
-                if isExpanded && music.isPlaying {
+                if isExpanded && music.isPlaying && !isVideoPlayerActive {
                     RadialGradient(
                         colors: [
                             music.themeColor.opacity(0.22),
@@ -88,7 +90,10 @@ public struct IslandView: View {
                 }
                 
                 // Content with Smooth Spring Transitions
-                if isExpanded {
+                if isVideoPlayerActive {
+                    pureNotchVideoView
+                        .transition(.opacity)
+                } else if isExpanded {
                     nookDashboardView
                         .transition(.opacity)
                 } else {
@@ -128,6 +133,11 @@ public struct IslandView: View {
         .onAppear {
             startLiveEqualizer()
             startRadarAnimation()
+        }
+        .onChange(of: provider.expansionState) { state in
+            if case .compact = state {
+                isShowingSettingsInVideoMode = false
+            }
         }
     }
     
@@ -339,6 +349,7 @@ public struct IslandView: View {
                     Button(action: {
                         withAnimation(AnimationConstants.quickInteractive) {
                             activeTopTab = "Music"
+                            isShowingSettingsInVideoMode = false
                         }
                     }) {
                         HStack(spacing: 4) {
@@ -376,6 +387,7 @@ public struct IslandView: View {
                     Button(action: {
                         withAnimation(AnimationConstants.quickInteractive) {
                             activeTopTab = "Calendar"
+                            isShowingSettingsInVideoMode = false
                         }
                     }) {
                         HStack(spacing: 4) {
@@ -389,7 +401,7 @@ public struct IslandView: View {
                         .padding(.vertical, 4.5)
                         .background(
                             activeTopTab == "Calendar" ?
-                            LinearGradient(colors: [Color.orange.opacity(0.35), Color.yellow.opacity(0.18)], startPoint: .topLeading, endPoint: .bottomTrailing) :
+                            LinearGradient(colors: [Color.orange.opacity(0.38), Color.yellow.opacity(0.20)], startPoint: .topLeading, endPoint: .bottomTrailing) :
                             LinearGradient(colors: [Color.white.opacity(0.06), Color.white.opacity(0.04)], startPoint: .topLeading, endPoint: .bottomTrailing)
                         )
                         .foregroundColor(activeTopTab == "Calendar" ? .white : .white.opacity(0.65))
@@ -401,14 +413,15 @@ public struct IslandView: View {
                     }
                     .buttonStyle(.plain)
                     
-                    // 3. Tray / Clipboard Tab
+                    // 3. Clipboard / Tray Tab
                     Button(action: {
                         withAnimation(AnimationConstants.quickInteractive) {
                             activeTopTab = "Tray"
+                            isShowingSettingsInVideoMode = false
                         }
                     }) {
                         HStack(spacing: 4) {
-                            Image(systemName: "tray.fill")
+                            Image(systemName: "tray.full.fill")
                                 .font(.system(size: 10))
                                 .foregroundColor(activeTopTab == "Tray" ? .cyan : .white.opacity(0.6))
                             Text("Tepsi (Pano)")
@@ -429,6 +442,36 @@ public struct IslandView: View {
                         )
                     }
                     .buttonStyle(.plain)
+                    
+                    // 4. Audio Mixer Tab
+                    Button(action: {
+                        withAnimation(AnimationConstants.quickInteractive) {
+                            activeTopTab = "Audio"
+                            isShowingSettingsInVideoMode = false
+                        }
+                    }) {
+                        HStack(spacing: 4) {
+                            Image(systemName: "slider.vertical.3")
+                                .font(.system(size: 10))
+                                .foregroundColor(activeTopTab == "Audio" ? .purple : .white.opacity(0.6))
+                            Text("Ses")
+                                .font(.system(size: 11, weight: .bold, design: .rounded))
+                        }
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 4.5)
+                        .background(
+                            activeTopTab == "Audio" ?
+                            LinearGradient(colors: [Color.purple.opacity(0.40), Color.indigo.opacity(0.22)], startPoint: .topLeading, endPoint: .bottomTrailing) :
+                            LinearGradient(colors: [Color.white.opacity(0.06), Color.white.opacity(0.04)], startPoint: .topLeading, endPoint: .bottomTrailing)
+                        )
+                        .foregroundColor(activeTopTab == "Audio" ? .white : .white.opacity(0.65))
+                        .clipShape(Capsule())
+                        .overlay(
+                            Capsule()
+                                .stroke(activeTopTab == "Audio" ? Color.purple.opacity(0.55) : Color.clear, lineWidth: 1)
+                        )
+                    }
+                    .buttonStyle(.plain)
                 }
                 
                 Spacer()
@@ -438,8 +481,10 @@ public struct IslandView: View {
                     withAnimation(AnimationConstants.quickInteractive) {
                         if activeTopTab == "Settings" {
                             activeTopTab = "Music"
+                            isShowingSettingsInVideoMode = false
                         } else {
                             activeTopTab = "Settings"
+                            isShowingSettingsInVideoMode = true
                         }
                     }
                 }) {
@@ -462,6 +507,7 @@ public struct IslandView: View {
                 Button(action: {
                     withAnimation(AnimationConstants.islandMorphSpring) {
                         provider.collapse()
+                        isShowingSettingsInVideoMode = false
                     }
                 }) {
                     Image(systemName: "xmark")
@@ -501,6 +547,13 @@ public struct IslandView: View {
                         .padding(.bottom, 10)
                         .frame(height: 186)
                         .transition(.opacity)
+                } else if activeTopTab == "Audio" {
+                    // Per-App Audio Mixer Module
+                    AudioMixerModuleView()
+                        .padding(.horizontal, 28)
+                        .padding(.bottom, 10)
+                        .frame(height: 180)
+                        .transition(.opacity)
                 } else if activeTopTab == "Settings" {
                     // In-Island Permissions & Settings View
                     islandSettingsAndPermissionsView
@@ -512,6 +565,169 @@ public struct IslandView: View {
             }
             .frame(height: tabContentHeight)
         }
+    }
+    
+    // MARK: - Framed Notch Video Player View
+    private var pureNotchVideoView: some View {
+        VStack(spacing: 8) {
+            // Header Bar: Video Title (left) & Settings Gear (right)
+            HStack(spacing: 8) {
+                HStack(spacing: 6) {
+                    Image(systemName: "play.tv.fill")
+                        .font(.system(size: 11, weight: .bold))
+                        .foregroundColor(.red)
+                    Text(music.title.isEmpty ? "YouTube Video" : music.title)
+                        .font(.system(size: 11.5, weight: .bold, design: .rounded))
+                        .foregroundColor(.white)
+                        .lineLimit(1)
+                }
+                
+                Spacer()
+                
+                // Settings Gear Button - Switches tab inside Dynamic Island directly to Settings
+                Button(action: {
+                    withAnimation(AnimationConstants.quickInteractive) {
+                        isShowingSettingsInVideoMode = true
+                        activeTopTab = "Settings"
+                        settingsSubTab = "Permissions"
+                        provider.expansionState = .expanded(provider.activeModule)
+                    }
+                }) {
+                    Image(systemName: "gearshape.fill")
+                        .font(.system(size: 11, weight: .bold))
+                        .foregroundColor(.white.opacity(0.85))
+                        .padding(6)
+                        .background(.ultraThinMaterial)
+                        .background(Color.white.opacity(0.15))
+                        .clipShape(Circle())
+                }
+                .buttonStyle(.plain)
+                .help("Ayarlar")
+            }
+            .padding(.horizontal, 24)
+            .padding(.top, isTopAttached ? 10 : 8)
+            
+            // Video Screen with rounded corners
+            ZStack {
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .fill(Color.black)
+                
+                NotchVideoPlayerView(
+                    videoUrl: music.lastActiveUrl.isEmpty ? "https://www.youtube.com" : music.lastActiveUrl,
+                    startTime: music.currentPosition
+                )
+                .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+            }
+            .frame(height: 190)
+            .padding(.horizontal, 22)
+            
+            // Bottom Controls Bar: Timeline Scrubber & Playback Controls
+            VStack(spacing: 10) {
+                // Wide Scrubber Timeline Bar
+                HStack(spacing: 12) {
+                    Text(music.formattedPosition)
+                        .font(.system(size: 10, weight: .medium, design: .monospaced))
+                        .foregroundColor(.white.opacity(0.75))
+                        .fixedSize(horizontal: true, vertical: false)
+                    
+                    GeometryReader { geo in
+                        let total = max(1.0, music.duration)
+                        let progress = min(1.0, max(0.0, music.currentPosition / total))
+                        
+                        ZStack(alignment: .leading) {
+                            Capsule()
+                                .fill(Color.white.opacity(0.18))
+                                .frame(height: 4)
+                            
+                            Capsule()
+                                .fill(
+                                    LinearGradient(
+                                        colors: [
+                                            Color.red,
+                                            Color.orange
+                                        ],
+                                        startPoint: .leading,
+                                        endPoint: .trailing
+                                    )
+                                )
+                                .frame(width: max(4, geo.size.width * CGFloat(progress)), height: 4)
+                            
+                            Circle()
+                                .fill(Color.white)
+                                .frame(width: 9.5, height: 9.5)
+                                .shadow(color: Color.red.opacity(0.9), radius: 3)
+                                .offset(x: max(0, min(geo.size.width - 9.5, geo.size.width * CGFloat(progress) - 4.75)))
+                        }
+                        .frame(height: 12)
+                        .contentShape(Rectangle())
+                        .gesture(
+                            DragGesture(minimumDistance: 0)
+                                .onChanged { value in
+                                    let ratio = max(0, min(1, value.location.x / geo.size.width))
+                                    let newPos = ratio * total
+                                    music.seek(to: newPos)
+                                }
+                        )
+                    }
+                    .frame(height: 12)
+                    
+                    Text(music.formattedDuration)
+                        .font(.system(size: 10, weight: .medium, design: .monospaced))
+                        .foregroundColor(.white.opacity(0.55))
+                        .fixedSize(horizontal: true, vertical: false)
+                }
+                
+                // Playback Buttons: Geri Sar (10s) - Durdur/Başlat - İleri Sar (10s)
+                HStack(spacing: 36) {
+                    // Geri Sar (10 sn)
+                    Button(action: {
+                        withAnimation(AnimationConstants.quickInteractive) {
+                            music.skipBackward10()
+                        }
+                    }) {
+                        Image(systemName: "gobackward.10")
+                            .font(.system(size: 13.5, weight: .semibold))
+                            .foregroundColor(.white.opacity(0.85))
+                    }
+                    .buttonStyle(.plain)
+                    .help("10 sn Geri")
+                    
+                    // Oynat / Duraklat
+                    Button(action: {
+                        withAnimation(AnimationConstants.quickInteractive) {
+                            music.togglePlayPause()
+                        }
+                    }) {
+                        Image(systemName: music.isPlaying ? "pause.fill" : "play.fill")
+                            .font(.system(size: 13.5, weight: .bold))
+                            .foregroundColor(.white)
+                            .padding(7.5)
+                            .background(.ultraThinMaterial)
+                            .background(Color.white.opacity(0.18))
+                            .clipShape(Circle())
+                    }
+                    .buttonStyle(.plain)
+                    
+                    // İleri Sar (10 sn)
+                    Button(action: {
+                        withAnimation(AnimationConstants.quickInteractive) {
+                            music.skipForward10()
+                        }
+                    }) {
+                        Image(systemName: "goforward.10")
+                            .font(.system(size: 13.5, weight: .semibold))
+                            .foregroundColor(.white.opacity(0.85))
+                    }
+                    .buttonStyle(.plain)
+                    .help("10 sn İleri")
+                }
+                .padding(.top, 4)
+            }
+            .padding(.horizontal, 24)
+            .padding(.top, 14)
+            .padding(.bottom, 16)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
     
     // MARK: - Full Width Music Player Section with HD Cover & Wide Scrubber
@@ -824,12 +1040,20 @@ public struct IslandView: View {
         }
     }
     
+    private var isVideoPlayerActive: Bool {
+        settings.enableNotchVideoPlayer && (music.isYouTube || !music.lastActiveUrl.isEmpty) && !isShowingSettingsInVideoMode
+    }
+    
     private var isExpanded: Bool {
+        if isVideoPlayerActive { return true }
         if case .expanded = provider.expansionState { return true }
         return false
     }
     
     private var islandWidth: CGFloat {
+        if isVideoPlayerActive {
+            return 510
+        }
         guard isExpanded else {
             if faceRecognition.isScanning {
                 return 340
@@ -847,6 +1071,8 @@ public struct IslandView: View {
             return 570
         case "Tray":
             return 740
+        case "Audio":
+            return 620
         case "Settings":
             return 660
         default:
@@ -858,10 +1084,12 @@ public struct IslandView: View {
         switch activeTopTab {
         case "Tray":
             return 186
+        case "Audio":
+            return 180
         case "Settings":
             switch settingsSubTab {
             case "Style":
-                return 118
+                return 165
             case "Permissions":
                 return 165
             default: // "FaceID"
@@ -875,14 +1103,19 @@ public struct IslandView: View {
     }
     
     private var islandHeight: CGFloat {
+        if isVideoPlayerActive {
+            return 356
+        }
         guard isExpanded else { return 35 }
         switch activeTopTab {
         case "Tray":
-            return 240
+            return 242
+        case "Audio":
+            return 236
         case "Settings":
             switch settingsSubTab {
             case "Style":
-                return 178
+                return 222
             case "Permissions":
                 return 222
             default: // "FaceID"
@@ -1120,6 +1353,50 @@ public struct IslandView: View {
                 }
                 .buttonStyle(.plain)
             }
+            
+            // Row 2: Çentikte Video Oynatıcı Toggle
+            Button(action: {
+                withAnimation(AnimationConstants.quickInteractive) {
+                    settings.enableNotchVideoPlayer.toggle()
+                }
+            }) {
+                HStack(spacing: 12) {
+                    ZStack {
+                        RoundedRectangle(cornerRadius: 8, style: .continuous)
+                            .fill(settings.enableNotchVideoPlayer ? Color.red.opacity(0.25) : Color.white.opacity(0.08))
+                            .frame(width: 32, height: 32)
+                        
+                        Image(systemName: "play.tv.fill")
+                            .font(.system(size: 14, weight: .bold))
+                            .foregroundColor(settings.enableNotchVideoPlayer ? .red : .white.opacity(0.75))
+                    }
+                    
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Çentikte Video İzleme (YouTube / Web PiP)")
+                            .font(.system(size: 11.5, weight: .bold, design: .rounded))
+                            .foregroundColor(.white)
+                        
+                        Text("YouTube ve desteklenen sitelerde videoyu çentik adasında izleyin")
+                            .font(.system(size: 9.5))
+                            .foregroundColor(.white.opacity(0.55))
+                    }
+                    
+                    Spacer()
+                    
+                    Toggle("", isOn: Binding(get: { settings.enableNotchVideoPlayer }, set: { settings.enableNotchVideoPlayer = $0 }))
+                        .toggleStyle(.switch)
+                        .labelsHidden()
+                        .scaleEffect(0.8)
+                }
+                .padding(10)
+                .background(settings.enableNotchVideoPlayer ? Color.red.opacity(0.12) : Color.white.opacity(0.04))
+                .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                        .stroke(settings.enableNotchVideoPlayer ? Color.red.opacity(0.40) : Color.white.opacity(0.08), lineWidth: 1)
+                )
+            }
+            .buttonStyle(.plain)
         }
         .frame(maxWidth: .infinity, alignment: .topLeading)
     }
@@ -1373,7 +1650,7 @@ public struct IslandView: View {
                     .frame(width: 120, alignment: .leading)
                 
                 // Custom Gradient Glassmorphic Slider (Green Emerald Gradient)
-                CustomSensitivitySlider(value: $settings.faceIDThreshold)
+                CustomSensitivitySlider(value: Binding(get: { settings.faceIDThreshold }, set: { settings.faceIDThreshold = $0 }))
                     .frame(maxWidth: .infinity)
                 
                 HStack(spacing: 2) {
@@ -1424,7 +1701,7 @@ public struct IslandView: View {
                 )
                 
                 inIslandPermissionCard(
-                    title: "Ekran Kaydı (Önizleme)",
+                    title: "Ekran Kaydı (Çentik Video)",
                     icon: "display",
                     isGranted: permissions.screenRecordingGranted,
                     onGrant: { permissions.requestScreenRecording() },

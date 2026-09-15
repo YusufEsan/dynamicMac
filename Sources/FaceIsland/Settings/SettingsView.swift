@@ -152,7 +152,7 @@ public struct SettingsView: View {
                     // 3. Screen Recording
                     permissionRow(
                         title: "Ekran Kaydı (Screen Recording)",
-                        description: "Pencere değiştiricide açık pencerelerin canlı minyatür önizlemeleri için kullanılır.",
+                        description: "Çentikte canlı YouTube/web video oynatıcı ve pencere önizlemeleri için gereklidir.",
                         icon: "display",
                         isGranted: permissions.screenRecordingGranted,
                         onGrant: {

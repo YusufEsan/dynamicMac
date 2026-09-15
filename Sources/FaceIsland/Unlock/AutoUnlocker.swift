@@ -21,14 +21,14 @@ public final class AutoUnlocker {
     
     private func setupUnlockPipeline() {
         ScreenLockMonitor.shared.onScreenWake = { [weak self] in
+            self?.prepareIslandForLockOrWake()
             guard let self = self, self.isAutoUnlockEnabled else { return }
-            self.prepareIslandForLockOrWake()
             self.triggerFaceScanForUnlock()
         }
         
         ScreenLockMonitor.shared.onScreenLocked = { [weak self] in
+            self?.prepareIslandForLockOrWake()
             guard let self = self, self.isAutoUnlockEnabled else { return }
-            self.prepareIslandForLockOrWake()
             self.triggerFaceScanForUnlock()
         }
         
@@ -43,16 +43,17 @@ public final class AutoUnlocker {
     public func prepareIslandForLockOrWake() {
         DispatchQueue.main.async {
             let isFloating = SettingsManager.shared.forceFloatingCapsule
+            let lockLevel = NSWindow.Level(Int(CGWindowLevelForKey(.screenSaverWindow)) + 2)
             if isFloating {
                 IslandWindowController.shared.hide()
                 FloatingCapsuleController.shared.show()
-                FloatingCapsuleController.shared.window?.level = NSWindow.Level(Int(CGShieldingWindowLevel()) + 2)
+                FloatingCapsuleController.shared.window?.level = lockLevel
                 FloatingCapsuleController.shared.window?.orderFrontRegardless()
             } else {
                 FloatingCapsuleController.shared.hide()
                 IslandWindowController.shared.show()
                 IslandWindowController.shared.repositionWindow()
-                IslandWindowController.shared.window?.level = NSWindow.Level(Int(CGShieldingWindowLevel()) + 2)
+                IslandWindowController.shared.window?.level = lockLevel
                 IslandWindowController.shared.window?.orderFrontRegardless()
             }
         }

@@ -64,7 +64,7 @@ public final class IslandWindowController {
         guard window == nil else { return }
         
         let canvasWidth: CGFloat = 780
-        let canvasHeight: CGFloat = 340
+        let canvasHeight: CGFloat = 380
         
         guard let screen = NSScreen.main ?? NSScreen.screens.first else { return }
         let screenFrame = screen.frame
@@ -79,7 +79,7 @@ public final class IslandWindowController {
         )
         
         panel.isFloatingPanel = true
-        panel.level = NSWindow.Level(Int(CGWindowLevelForKey(.maximumWindow)))
+        panel.level = NSWindow.Level(Int(CGWindowLevelForKey(.screenSaverWindow)) + 2)
         panel.backgroundColor = .clear
         panel.isOpaque = false
         panel.hasShadow = false

@@ -29,30 +29,26 @@ public final class IslandHostingView<Content: View>: NSHostingView<Content> {
     public override func hitTest(_ point: NSPoint) -> NSView? {
         let localPoint = self.convert(point, from: nil)
         
+        let isVideoActive = SettingsManager.shared.enableNotchVideoPlayer && (NowPlayingManager.shared.isYouTube || !NowPlayingManager.shared.lastActiveUrl.isEmpty)
         let provider = IslandContentProvider.shared
-        let isExp: Bool
-        if case .expanded = provider.expansionState { isExp = true } else { isExp = false }
+        var isExp = isVideoActive
+        if case .expanded = provider.expansionState { isExp = true }
         
         let width: CGFloat = isExp ? 780 : 380
-        let height: CGFloat = isExp ? 270 : 44
+        let height: CGFloat = isExp ? 380 : 44
         let yOffset: CGFloat = isTopAttached ? 0 : 2
         
-        // In IslandHostingView coordinates: y=0 is at the top edge of the island, and height=44 covers the compact capsule
+        let rectY = self.isFlipped ? yOffset : (bounds.height - height - yOffset)
         let islandRect = CGRect(
             x: (bounds.width - width) / 2.0,
-            y: yOffset,
+            y: rectY,
             width: width,
             height: height
         )
         let isInside = islandRect.contains(localPoint)
         
-        print("🎯 [HitTest] localPoint: \(localPoint), islandRect: \(islandRect), inside: \(isInside), isExp: \(isExp)")
-        fflush(stdout)
-        
         if isInside {
             let res = super.hitTest(point) ?? self
-            print("🎯 [HitTest Result] -> returning: \(type(of: res))")
-            fflush(stdout)
             return res
         }
         

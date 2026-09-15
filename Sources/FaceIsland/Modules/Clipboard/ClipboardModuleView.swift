@@ -1,7 +1,7 @@
 import SwiftUI
 
 public struct ClipboardModuleView: View {
-    @Bindable private var clipboardManager = ClipboardManager.shared
+    private var clipboardManager = ClipboardManager.shared
     @State private var selectedTab: ClipboardDeviceSource? = nil
     @State private var searchText: String = ""
     @State private var copiedItemId: UUID? = nil
@@ -86,12 +86,17 @@ public struct ClipboardModuleView: View {
             }
             .padding(.horizontal, 2)
             
-            // Content: 2-Row Horizontal Grid of Cards
+            // Content: Multi-Column Horizontal-First Flow Grid of Cards
             if displayedItems.isEmpty {
                 emptyStateView
             } else {
-                ScrollView(.horizontal, showsIndicators: false) {
-                    LazyHGrid(rows: [GridItem(.fixed(72)), GridItem(.fixed(72))], spacing: 10) {
+                ScrollView(.vertical, showsIndicators: false) {
+                    LazyVGrid(columns: [
+                        GridItem(.flexible(), spacing: 8),
+                        GridItem(.flexible(), spacing: 8),
+                        GridItem(.flexible(), spacing: 8),
+                        GridItem(.flexible(), spacing: 8)
+                    ], spacing: 8) {
                         ForEach(displayedItems.prefix(40)) { item in
                             clipboardCard(item: item)
                         }
@@ -99,7 +104,7 @@ public struct ClipboardModuleView: View {
                     .padding(.horizontal, 2)
                     .padding(.vertical, 2)
                 }
-                .frame(height: 150)
+                .frame(height: 152)
             }
         }
     }
@@ -183,7 +188,7 @@ public struct ClipboardModuleView: View {
                 }
             }
             .padding(8)
-            .frame(width: 175, height: 70)
+            .frame(maxWidth: .infinity, minHeight: 70, maxHeight: 70)
             .background(isCopied ? Color.green.opacity(0.18) : Color.white.opacity(0.08))
             .cornerRadius(10)
             .overlay(

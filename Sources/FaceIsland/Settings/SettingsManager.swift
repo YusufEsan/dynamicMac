@@ -61,6 +61,18 @@ public final class SettingsManager {
         set { UserDefaults.standard.set(newValue, forKey: "FaceIsland_SwitcherHotkey") }
     }
     
+    public var enableNotchVideoPlayer: Bool {
+        get {
+            if UserDefaults.standard.object(forKey: "FaceIsland_EnableNotchVideoPlayer") == nil {
+                return true
+            }
+            return UserDefaults.standard.bool(forKey: "FaceIsland_EnableNotchVideoPlayer")
+        }
+        set {
+            UserDefaults.standard.set(newValue, forKey: "FaceIsland_EnableNotchVideoPlayer")
+        }
+    }
+    
     private init() {
         FaceRecognitionManager.shared.recognitionThreshold = Float(faceIDThreshold)
     }
