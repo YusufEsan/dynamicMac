@@ -6,7 +6,7 @@ struct FaceIslandApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
     
     var body: some Scene {
-        MenuBarExtra("FaceIsland", systemImage: "oval.portrait") {
+        MenuBarExtra("FaceIsland", systemImage: "faceid") {
             Button("Ayarlar...") {
                 NotificationCenter.default.post(name: NSNotification.Name("FaceIsland_OpenInIslandSettings"), object: nil)
                 IslandContentProvider.shared.expand(to: .faceID)

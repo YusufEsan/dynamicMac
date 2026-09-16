@@ -1,0 +1,50 @@
+name: Release Build
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build & Release FaceIsland DMG
+    runs-on: macos-14
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Swift
+        uses: swift-actions/setup-swift@v2
+        with:
+          swift-version: '6.0'
+
+      - name: Build Release Binary
+        run: |
+          swift build -c release
+
+      - name: Package FaceIsland.app & DMG
+        run: |
+          mkdir -p FaceIsland.app/Contents/MacOS
+          mkdir -p FaceIsland.app/Contents/Resources
+          cp .build/release/FaceIsland FaceIsland.app/Contents/MacOS/FaceIsland
+          chmod +x FaceIsland.app/Contents/MacOS/FaceIsland
+          
+          # Create DMG
+          mkdir -p dist_dmg
+          cp -R FaceIsland.app dist_dmg/
+          ln -s /Applications dist_dmg/Applications
+          hdiutil create -volname "FaceIsland" -srcfolder dist_dmg -ov -format UDZO FaceIsland.dmg
+          rm -rf dist_dmg
+
+      - name: Create GitHub Release & Upload DMG
+        uses: softprops/action-gh-release@v2
+        with:
+          files: FaceIsland.dmg
+          name: FaceIsland ${{ github.ref_name }}
+          body_path: RELEASE_NOTES.md
+          draft: false
+          prerelease: false
