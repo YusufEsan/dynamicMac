@@ -17,56 +17,56 @@
 
 ---
 
-## 📸 Ekran Görüntüleri & Modüller (Screenshots)
+## Ekran Görüntüleri ve Modüller (Screenshots)
 
 <p align="center">
-  <img src="assets/screenshots/01_music_player.png" width="600" alt="Medya & Müzik Çalar" />
-  <br><i>🎵 Spotify / Apple Music Canlı Medya Çalar & Dinamik Renk Teması</i>
+  <b>Spotify / Apple Music Canlı Medya Çalar ve Dinamik Renk Teması</b><br><br>
+  <img src="assets/screenshots/01_music_player.png" width="600" alt="Medya ve Müzik Çalar" />
 </p>
 
 <p align="center">
+  <b>Çentik İçi Canlı Video Oynatıcı (YouTube / Web PiP Video Stream)</b><br><br>
   <img src="assets/screenshots/10_notch_video_player.png" width="600" alt="Çentik Video Oynatıcı" />
-  <br><i>🎬 Çentik İçi Canlı Video Oynatıcı (YouTube / Web PiP Video Stream)</i>
 </p>
 
 <p align="center">
+  <b>Uygulama Başına Renkli Bağımsız Ses Kontrolü ve Ekolayzır</b><br><br>
   <img src="assets/screenshots/02_audio_mixer.png" width="600" alt="Uygulama Başına Ses Mikseri" />
-  <br><i>🎛️ Uygulama Başına Renkli Bağımsız Ses Kontrolü & Ekolayzır</i>
 </p>
 
 <p align="center">
+  <b>Pano Geçmişi (Clipboard Manager) ve Filtreleme</b><br><br>
   <img src="assets/screenshots/03_clipboard_manager.png" width="600" alt="Akıllı Pano Yöneticisi" />
-  <br><i>📋 Pano Geçmişi (Clipboard Manager) & Filtreleme</i>
 </p>
 
 <p align="center">
-  <img src="assets/screenshots/08_calendar.png" width="600" alt="Takvim & Etkinlik Şeridi" />
-  <br><i>📅 Haftalık İnteraktif Takvim & Etkinlik Geri Sayımı</i>
+  <b>Haftalık İnteraktif Takvim ve Etkinlik Geri Sayımı</b><br><br>
+  <img src="assets/screenshots/08_calendar.png" width="600" alt="Takvim ve Etkinlik Şeridi" />
 </p>
 
 <p align="center">
+  <b>Yerel Apple Vision Face ID Tanıma ve Biyometrik Kilit Açma</b><br><br>
   <img src="assets/screenshots/04_settings_faceid.png" width="600" alt="Face ID Ayarları" />
-  <br><i>👤 Yerel Apple Vision Face ID Tanıma & Biyometrik Kilit Açma</i>
 </p>
 
 <p align="center">
+  <b>Çentik / Yüzen Kapsül Modu Seçimi ve Canlı Çentik Video Denetimi</b><br><br>
   <img src="assets/screenshots/07_settings_style.png" width="600" alt="Ada Stili Ayarları" />
-  <br><i>⚙️ Çentik / Yüzen Kapsül Modu Seçimi & Canlı Çentik Video Denetimi</i>
 </p>
 
 <p align="center">
+  <b>Sistem İzinleri ve Tek Tıkla Yapılandırma</b><br><br>
   <img src="assets/screenshots/05_settings_permissions.png" width="600" alt="Sistem İzinleri" />
-  <br><i>🛡️ Sistem İzinleri & Tek Tıkla Yapılandırma</i>
 </p>
 
 <p align="center">
+  <b>Yüzen Kapsül (Floating Capsule) Serbest Ada Modu</b><br><br>
   <img src="assets/screenshots/09_floating_capsule.png" width="400" alt="Yüzen Kapsül Modu" />
-  <br><i>🫧 Yüzen Kapsül (Floating Capsule) Serbest Ada Modu</i>
 </p>
 
 <p align="center">
+  <b>Kompakt Çentik Bildirim Durumu</b><br><br>
   <img src="assets/screenshots/06_compact_notch.png" width="400" alt="Kompakt Çentik Görünümü" />
-  <br><i>⚡ Kompakt Çentik Bildirim Durumu</i>
 </p>
 
 ---
