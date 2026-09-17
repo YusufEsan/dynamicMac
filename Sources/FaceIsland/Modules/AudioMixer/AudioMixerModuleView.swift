@@ -92,9 +92,48 @@ public struct AudioMixerModuleView: View {
                 .lineLimit(1)
                 .frame(width: 140, alignment: .leading)
             
-            // Slider
-            Slider(value: value, in: 0...100, step: 1)
-                .tint(iconColor)
+            // Custom Colored Slider
+            GeometryReader { geo in
+                let val = CGFloat(value.wrappedValue) / 100.0
+                let progress = max(0, min(1, val))
+                let width = geo.size.width
+                
+                ZStack(alignment: .leading) {
+                    // Track background
+                    Capsule()
+                        .fill(Color.white.opacity(0.12))
+                        .frame(height: 5)
+                    
+                    // Filled colored progress
+                    Capsule()
+                        .fill(
+                            LinearGradient(
+                                colors: [iconColor.opacity(0.8), iconColor],
+                                startPoint: .leading,
+                                endPoint: .trailing
+                            )
+                        )
+                        .frame(width: max(5, width * progress), height: 5)
+                        .shadow(color: iconColor.opacity(0.4), radius: 3)
+                    
+                    // Thumb
+                    Circle()
+                        .fill(Color.white)
+                        .frame(width: 12, height: 12)
+                        .shadow(color: iconColor.opacity(0.6), radius: 3)
+                        .offset(x: max(0, min(width - 12, (width * progress) - 6)))
+                }
+                .frame(height: 18)
+                .contentShape(Rectangle())
+                .gesture(
+                    DragGesture(minimumDistance: 0)
+                        .onChanged { gesture in
+                            let ratio = max(0, min(1, gesture.location.x / width))
+                            value.wrappedValue = Double(ratio * 100.0)
+                        }
+                )
+            }
+            .frame(height: 18)
             
             // Percent Text
             Text("\(Int(value.wrappedValue))%")

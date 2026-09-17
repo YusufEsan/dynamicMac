@@ -221,8 +221,45 @@ public struct NotchVideoPlayerView: NSViewRepresentable {
         imageView.setContentHuggingPriority(.defaultLow, for: .horizontal)
         imageView.setContentHuggingPriority(.defaultLow, for: .vertical)
         
+        // Initial stylish placeholder when no active window is mirrored
+        imageView.image = Self.createFallbackPreviewImage()
+        
         context.coordinator.startCapture(in: imageView)
         return imageView
+    }
+    
+    public static func createFallbackPreviewImage() -> NSImage {
+        let size = NSSize(width: 480, height: 270)
+        let image = NSImage(size: size)
+        image.lockFocus()
+        
+        // Cinematic gradient backdrop
+        let grad = NSGradient(colors: [
+            NSColor(red: 0.08, green: 0.05, blue: 0.15, alpha: 1.0),
+            NSColor(red: 0.22, green: 0.08, blue: 0.35, alpha: 1.0),
+            NSColor(red: 0.85, green: 0.12, blue: 0.25, alpha: 1.0)
+        ])
+        grad?.draw(in: NSRect(origin: .zero, size: size), angle: 30)
+        
+        // Center YouTube Play icon
+        let playConfig = NSImage.SymbolConfiguration(pointSize: 48, weight: .bold)
+        if let playSymbol = NSImage(systemSymbolName: "play.circle.fill", accessibilityDescription: nil)?.withSymbolConfiguration(playConfig) {
+            let symbolRect = NSRect(x: (size.width - 56) / 2, y: (size.height - 56) / 2 + 10, width: 56, height: 56)
+            NSColor.white.set()
+            playSymbol.draw(in: symbolRect)
+        }
+        
+        // Title Text
+        let attrs: [NSAttributedString.Key: Any] = [
+            .font: NSFont.systemFont(ofSize: 13, weight: .bold),
+            .foregroundColor: NSColor.white
+        ]
+        let title = "YouTube 4K Canlı Akış" as NSString
+        let textSize = title.size(withAttributes: attrs)
+        title.draw(at: NSPoint(x: (size.width - textSize.width) / 2, y: 35), withAttributes: attrs)
+        
+        image.unlockFocus()
+        return image
     }
     
     public func updateNSView(_ nsView: NSImageView, context: Context) {

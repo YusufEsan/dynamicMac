@@ -33,6 +33,10 @@ public struct IslandView: View {
     public var body: some View {
         @Bindable var settings = settings
         VStack(spacing: 0) {
+            if !isTopAttached {
+                Spacer(minLength: 0)
+            }
+            
             ZStack(alignment: .top) {
                 // Pitch Black Card Background with subtle frosted stroke & liquid glow (No top edge stroke)
                 IslandSquircle(cornerRadius: isExpanded ? 24 : 16, isTopAttached: isTopAttached)
@@ -117,11 +121,9 @@ public struct IslandView: View {
                 self.isHovering = hovering
             }
             
-            if isTopAttached {
-                Spacer(minLength: 0)
-            }
+            Spacer(minLength: 0)
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: isTopAttached ? .top : .center)
         .sheet(isPresented: $showEnrollmentSheet) {
             EnrollmentView()
         }
