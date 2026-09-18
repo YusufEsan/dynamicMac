@@ -8,6 +8,7 @@ public final class ClipboardManager {
     public var items: [ClipboardItem] = []
     public var retentionDays: Int = 7
     public var selectedSourceFilter: ClipboardDeviceSource? = nil
+    public var isMockMode: Bool = false
     
     private let pasteboard = NSPasteboard.general
     private var lastChangeCount: Int = 0
@@ -53,6 +54,7 @@ public final class ClipboardManager {
     }
     
     public func checkPasteboard() {
+        guard !isMockMode else { return }
         let currentCount = pasteboard.changeCount
         guard currentCount != lastChangeCount else { return }
         lastChangeCount = currentCount

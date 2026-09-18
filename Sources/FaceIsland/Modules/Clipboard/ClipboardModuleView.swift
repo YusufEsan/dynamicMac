@@ -64,11 +64,18 @@ public struct ClipboardModuleView: View {
                         .font(.system(size: 11))
                         .foregroundColor(.white.opacity(0.6))
                     
-                    TextField("Pano içinde ara...", text: $searchText)
-                        .textFieldStyle(.plain)
-                        .font(.system(size: 11.5, weight: .medium, design: .rounded))
-                        .foregroundColor(.white)
-                        .frame(width: displayedItems.count <= 1 ? 120 : 150)
+                    if clipboardManager.isMockMode {
+                        Text(searchText.isEmpty ? "Pano içinde ara..." : searchText)
+                            .font(.system(size: 11.5, weight: .medium, design: .rounded))
+                            .foregroundColor(searchText.isEmpty ? .white.opacity(0.4) : .white)
+                            .frame(width: displayedItems.count <= 1 ? 120 : 150, alignment: .leading)
+                    } else {
+                        TextField("Pano içinde ara...", text: $searchText)
+                            .textFieldStyle(.plain)
+                            .font(.system(size: 11.5, weight: .medium, design: .rounded))
+                            .foregroundColor(.white)
+                            .frame(width: displayedItems.count <= 1 ? 120 : 150)
+                    }
                     
                     if !searchText.isEmpty {
                         Button(action: { searchText = "" }) {
@@ -107,20 +114,43 @@ public struct ClipboardModuleView: View {
             // Content: Multi-Column Horizontal-First Flow Grid of Cards
             if displayedItems.isEmpty {
                 emptyStateView
+            } else if displayedItems.count > 8 {
+                ScrollView(.vertical, showsIndicators: true) {
+                    cardsGridView
+                        .padding(.horizontal, 2)
+                        .padding(.vertical, 2)
+                }
+                .frame(height: 154)
             } else {
-                ScrollView(.vertical, showsIndicators: displayedItems.count > 8) {
-                    LazyVGrid(columns: gridColumns, spacing: 8) {
-                        ForEach(displayedItems.prefix(40)) { item in
-                            clipboardCard(item: item)
-                        }
-                    }
+                cardsGridView
                     .padding(.horizontal, 2)
                     .padding(.vertical, 2)
-                }
-                .frame(height: displayedItems.count <= 4 ? 74 : 154)
             }
         }
         .frame(maxWidth: .infinity, alignment: .top)
+    }
+    
+    private var cardsGridView: some View {
+        let items = Array(displayedItems.prefix(20))
+        let colCount: Int = items.count <= 1 ? 1 : (items.count == 2 ? 2 : (items.count == 3 ? 3 : 4))
+        let rows = stride(from: 0, to: items.count, by: colCount).map {
+            Array(items[$0..<min($0 + colCount, items.count)])
+        }
+        
+        return VStack(spacing: 8) {
+            ForEach(0..<rows.count, id: \.self) { rowIndex in
+                HStack(spacing: 8) {
+                    ForEach(rows[rowIndex]) { item in
+                        clipboardCard(item: item)
+                    }
+                    if rows[rowIndex].count < colCount {
+                        ForEach(0..<(colCount - rows[rowIndex].count), id: \.self) { _ in
+                            Spacer().frame(maxWidth: .infinity)
+                        }
+                    }
+                }
+            }
+        }
     }
     
     // MARK: - Clipboard Card Component

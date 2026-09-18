@@ -27,6 +27,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         setlinebuf(stdout)
         setlinebuf(stderr)
+        
+        if CommandLine.arguments.contains("--generate-screenshots") {
+            ScreenshotGenerator.generateAll()
+            exit(0)
+        }
+        
         print("🚀 FaceIsland launched successfully (PID: \(ProcessInfo.processInfo.processIdentifier))")
         fflush(stdout)
         AppLogger.info("🚀 FaceIsland launched successfully", category: .general)

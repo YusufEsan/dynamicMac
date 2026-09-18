@@ -30,8 +30,14 @@ public struct IslandView: View {
     
     public var isTopAttached: Bool
     
-    public init(isTopAttached: Bool = true) {
+    public init(
+        isTopAttached: Bool = true,
+        initialTab: String = "Nook",
+        initialSettingsSubTab: String = "FaceID"
+    ) {
         self.isTopAttached = isTopAttached
+        self._activeTopTab = State(initialValue: initialTab)
+        self._settingsSubTab = State(initialValue: initialSettingsSubTab)
     }
     
     public var body: some View {
@@ -139,7 +145,6 @@ public struct IslandView: View {
         .onChange(of: provider.expansionState) {
             if case .compact = provider.expansionState {
                 isShowingSettingsInVideoMode = false
-                activeTopTab = "Music"
             }
             updateVisualDimensions()
         }
@@ -692,6 +697,7 @@ public struct IslandView: View {
                     // Full-Width Music Player
                     musicPlayerSection
                         .padding(.horizontal, 28)
+                        .padding(.top, 4)
                         .frame(height: tabContentHeight, alignment: .top)
                         .transition(.opacity)
                 } else if activeTopTab == "Calendar" {
@@ -721,7 +727,7 @@ public struct IslandView: View {
                 }
             }
             .frame(height: tabContentHeight, alignment: .top)
-            .padding(.bottom, 12)
+            .padding(.bottom, (activeTopTab == "Calendar" || activeTopTab == "Tray") ? 6 : 10)
         }
     }
     
@@ -771,11 +777,60 @@ public struct IslandView: View {
                 RoundedRectangle(cornerRadius: 12, style: .continuous)
                     .fill(Color.black)
                 
-                NotchVideoPlayerView(
-                    videoUrl: music.lastActiveUrl.isEmpty ? "https://www.youtube.com" : music.lastActiveUrl,
-                    startTime: music.currentPosition
-                )
-                .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                if ClipboardManager.shared.isMockMode {
+                    ZStack {
+                        LinearGradient(
+                            colors: [
+                                Color(red: 0.10, green: 0.14, blue: 0.24),
+                                Color(red: 0.16, green: 0.10, blue: 0.32),
+                                Color(red: 0.06, green: 0.06, blue: 0.12)
+                            ],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                        
+                        VStack(spacing: 10) {
+                            ZStack {
+                                Circle()
+                                    .fill(Color.red.opacity(0.90))
+                                    .frame(width: 50, height: 50)
+                                    .shadow(color: Color.red.opacity(0.6), radius: 12)
+                                
+                                Image(systemName: "play.fill")
+                                    .font(.system(size: 22, weight: .bold))
+                                    .foregroundColor(.white)
+                                    .offset(x: 2)
+                            }
+                            
+                            Text(music.title.isEmpty ? "Apple Keynote: macOS Sequoia & Apple Intelligence" : music.title)
+                                .font(.system(size: 13, weight: .bold, design: .rounded))
+                                .foregroundColor(.white)
+                                .multilineTextAlignment(.center)
+                                .padding(.horizontal, 20)
+                            
+                            HStack(spacing: 8) {
+                                Text("4K UHD")
+                                    .font(.system(size: 9, weight: .heavy, design: .rounded))
+                                    .foregroundColor(.black)
+                                    .padding(.horizontal, 5)
+                                    .padding(.vertical, 2)
+                                    .background(Color.yellow)
+                                    .clipShape(RoundedRectangle(cornerRadius: 3))
+                                
+                                Text("60 FPS • Canlı Yayın")
+                                    .font(.system(size: 10, weight: .medium))
+                                    .foregroundColor(.white.opacity(0.70))
+                            }
+                        }
+                    }
+                    .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                } else {
+                    NotchVideoPlayerView(
+                        videoUrl: music.lastActiveUrl.isEmpty ? "https://www.youtube.com" : music.lastActiveUrl,
+                        startTime: music.currentPosition
+                    )
+                    .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                }
             }
             .frame(height: 240)
             .padding(.horizontal, 22)
@@ -1408,11 +1463,11 @@ public struct IslandView: View {
     private var trayContentHeight: CGFloat {
         let count = ClipboardManager.shared.items.count
         if count == 0 {
-            return 124
+            return 80
         } else if count <= 4 {
-            return 124
+            return 84
         } else {
-            return 204
+            return 194
         }
     }
     
@@ -1437,9 +1492,9 @@ public struct IslandView: View {
                 return 138
             }
         case "Calendar":
-            return 68
+            return 64
         default: // "Music"
-            return 70
+            return 76
         }
     }
     
@@ -1463,9 +1518,9 @@ public struct IslandView: View {
                 return 202
             }
         case "Calendar":
-            return 132
+            return 120
         default:
-            return 134
+            return 138
         }
     }
     

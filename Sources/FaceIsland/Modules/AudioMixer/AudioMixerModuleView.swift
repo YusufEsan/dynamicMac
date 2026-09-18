@@ -26,42 +26,51 @@ public struct AudioMixerModuleView: View {
             }
             .padding(.horizontal, 4)
             
-            // Sliders Container (Scrollable after 5 rows)
-            ScrollView(.vertical, showsIndicators: mixer.activeAppCount > 5) {
-                VStack(spacing: 6) {
-                    // 1. Ana Sistem Sesi (Master Volume) - Always present
-                    volumeRow(
-                        title: "Ana Sistem Sesi",
-                        icon: mixer.isMasterMuted ? "speaker.slash.fill" : (mixer.masterVolume > 50 ? "speaker.wave.3.fill" : (mixer.masterVolume > 0 ? "speaker.wave.1.fill" : "speaker.fill")),
-                        iconColor: mixer.isMasterMuted ? .gray : Color(red: 0.11, green: 0.84, blue: 0.38),
-                        value: Binding(
-                            get: { mixer.masterVolume },
-                            set: { mixer.setMasterVolume($0) }
-                        ),
-                        isActive: true,
-                        isMuted: mixer.isMasterMuted,
-                        onMuteToggle: { mixer.toggleMasterMute() }
-                    )
-                    
-                    // 2. Dynamically Detected Active Apps
-                    ForEach(mixer.activeApps) { app in
-                        volumeRow(
-                            title: app.name,
-                            icon: app.icon,
-                            iconColor: app.isMuted ? .gray : app.iconColor,
-                            value: Binding(
-                                get: { app.volume },
-                                set: { mixer.setAppVolume(id: app.id, volume: $0) }
-                            ),
-                            isActive: true,
-                            isMuted: app.isMuted || app.volume == 0,
-                            onMuteToggle: { mixer.toggleAppMute(id: app.id) }
-                        )
-                    }
+            // Sliders Container
+            if mixer.activeAppCount > 5 {
+                ScrollView(.vertical, showsIndicators: true) {
+                    slidersList
                 }
-                .padding(.horizontal, 2)
+                .frame(height: 200)
+            } else {
+                slidersList
             }
         }
+    }
+    
+    private var slidersList: some View {
+        VStack(spacing: 6) {
+            // 1. Ana Sistem Sesi (Master Volume) - Always present
+            volumeRow(
+                title: "Ana Sistem Sesi",
+                icon: mixer.isMasterMuted ? "speaker.slash.fill" : (mixer.masterVolume > 50 ? "speaker.wave.3.fill" : (mixer.masterVolume > 0 ? "speaker.wave.1.fill" : "speaker.fill")),
+                iconColor: mixer.isMasterMuted ? .gray : Color(red: 0.11, green: 0.84, blue: 0.38),
+                value: Binding(
+                    get: { mixer.masterVolume },
+                    set: { mixer.setMasterVolume($0) }
+                ),
+                isActive: true,
+                isMuted: mixer.isMasterMuted,
+                onMuteToggle: { mixer.toggleMasterMute() }
+            )
+            
+            // 2. Dynamically Detected Active Apps
+            ForEach(mixer.activeApps) { app in
+                volumeRow(
+                    title: app.name,
+                    icon: app.icon,
+                    iconColor: app.isMuted ? .gray : app.iconColor,
+                    value: Binding(
+                        get: { app.volume },
+                        set: { mixer.setAppVolume(id: app.id, volume: $0) }
+                    ),
+                    isActive: true,
+                    isMuted: app.isMuted || app.volume == 0,
+                    onMuteToggle: { mixer.toggleAppMute(id: app.id) }
+                )
+            }
+        }
+        .padding(.horizontal, 2)
     }
     
     private func volumeRow(

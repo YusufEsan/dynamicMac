@@ -28,6 +28,7 @@ public final class AudioMixerManager {
     
     public var masterVolume: Double = 75.0
     public var isMasterMuted: Bool = false
+    public var isMockMode: Bool = false
     
     // Dynamic App List
     public var activeApps: [AudioAppInfo] = []
@@ -57,7 +58,7 @@ public final class AudioMixerManager {
     }
     
     public func fetchVolumes() {
-        guard !isUpdating else { return }
+        guard !isUpdating, !isMockMode else { return }
         isUpdating = true
         
         // 1. Detect open supported apps
