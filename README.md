@@ -21,52 +21,52 @@
 
 <p align="center">
   <b>1. Spotify / Apple Music Canlı Medya Çalar ve Dinamik Renk Teması</b><br><br>
-  <img src="assets/screenshots/01_music_player.png" width="600" alt="Medya ve Müzik Çalar" />
+  <img src="assets/screenshots/01_music_player.png" width="600" alt="Medya ve Müzik Çalar" style="border-radius: 18px;" />
 </p>
 
 <p align="center">
   <b>2. Haftalık İnteraktif Takvim ve Etkinlik Geri Sayımı</b><br><br>
-  <img src="assets/screenshots/02_calendar.png" width="600" alt="Takvim ve Etkinlik Şeridi" />
+  <img src="assets/screenshots/02_calendar.png" width="600" alt="Takvim ve Etkinlik Şeridi" style="border-radius: 18px;" />
 </p>
 
 <p align="center">
   <b>3. Pano Geçmişi (Clipboard Manager) ve Cihaz Filtreleme</b><br><br>
-  <img src="assets/screenshots/03_clipboard_manager.png" width="600" alt="Akıllı Pano Yöneticisi" />
+  <img src="assets/screenshots/03_clipboard_manager.png" width="600" alt="Akıllı Pano Yöneticisi" style="border-radius: 18px;" />
 </p>
 
 <p align="center">
   <b>4. Uygulama Başına Renkli Bağımsız Ses Kontrolü (Audio Mixer)</b><br><br>
-  <img src="assets/screenshots/04_audio_mixer.png" width="600" alt="Uygulama Başına Ses Mikseri" />
+  <img src="assets/screenshots/04_audio_mixer.png" width="600" alt="Uygulama Başına Ses Mikseri" style="border-radius: 18px;" />
 </p>
 
 <p align="center">
   <b>5. Yerel Apple Vision Face ID Tanıma ve Biyometrik Kilit Açma</b><br><br>
-  <img src="assets/screenshots/05_settings_faceid.png" width="600" alt="Face ID Ayarları" />
+  <img src="assets/screenshots/05_settings_faceid.png" width="600" alt="Face ID Ayarları" style="border-radius: 18px;" />
 </p>
 
 <p align="center">
   <b>6. Çentik / Yüzen Kapsül Modu ve Hızlı Çentik Video Seçimi (Ada Stili)</b><br><br>
-  <img src="assets/screenshots/06_settings_style.png" width="600" alt="Ada Stili Ayarları" />
+  <img src="assets/screenshots/06_settings_style.png" width="600" alt="Ada Stili Ayarları" style="border-radius: 18px;" />
 </p>
 
 <p align="center">
   <b>7. Sistem İzinleri ve Tek Tıkla Yapılandırma</b><br><br>
-  <img src="assets/screenshots/07_settings_permissions.png" width="600" alt="Sistem İzinleri" />
+  <img src="assets/screenshots/07_settings_permissions.png" width="600" alt="Sistem İzinleri" style="border-radius: 18px;" />
 </p>
 
 <p align="center">
   <b>8. Kompakt Çentik Bildirim ve Geri Sayım Durumu</b><br><br>
-  <img src="assets/screenshots/08_compact_notch.png" width="600" alt="Kompakt Çentik Görünümü" />
+  <img src="assets/screenshots/08_compact_notch.png" width="600" alt="Kompakt Çentik Görünümü" style="border-radius: 18px;" />
 </p>
 
 <p align="center">
   <b>9. Çentik İçi Canlı Video Oynatıcı (YouTube / Web PiP Video Stream)</b><br><br>
-  <img src="assets/screenshots/09_notch_video_player.png" width="600" alt="Çentik Video Oynatıcı" />
+  <img src="assets/screenshots/09_notch_video_player.png" width="600" alt="Çentik Video Oynatıcı" style="border-radius: 18px;" />
 </p>
 
 <p align="center">
   <b>10. Yüzen Kapsül (Floating Capsule) Serbest Ada Modu</b><br><br>
-  <img src="assets/screenshots/10_floating_capsule.png" width="600" alt="Yüzen Kapsül Modu" />
+  <img src="assets/screenshots/10_floating_capsule.png" width="600" alt="Yüzen Kapsül Modu" style="border-radius: 18px;" />
 </p>
 
 ---

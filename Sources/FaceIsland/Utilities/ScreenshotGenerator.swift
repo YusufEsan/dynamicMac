@@ -219,6 +219,6 @@ public struct ScreenshotGenerator {
             .frame(width: width, height: height)
         }
         .frame(width: width, height: height)
-        .clipped()
+        .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
     }
 }
