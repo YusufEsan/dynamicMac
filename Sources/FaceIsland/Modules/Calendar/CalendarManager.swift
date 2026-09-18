@@ -17,8 +17,14 @@ public struct CalendarEventItem: Identifiable, Equatable, Sendable {
     
     public var formattedStartTime: String {
         let formatter = DateFormatter()
-        formatter.timeStyle = .short
-        return formatter.string(from: startDate)
+        let calendar = Calendar.current
+        if calendar.isDateInToday(startDate) {
+            formatter.timeStyle = .short
+            return formatter.string(from: startDate)
+        } else {
+            formatter.dateFormat = "d MMM, HH:mm"
+            return formatter.string(from: startDate)
+        }
     }
 }
 
@@ -140,11 +146,20 @@ public final class CalendarManager {
             return
         }
         
-        let diff = next.startDate.timeIntervalSince(Date())
+        let now = Date()
+        let calendar = Calendar.current
+        
+        // Sadece gün içindeki ve henüz tamamlanmamış etkinlikler için süre göster
+        guard calendar.isDateInToday(next.startDate) || (next.startDate <= now && next.endDate > now) else {
+            countdownString = ""
+            return
+        }
+        
+        let diff = next.startDate.timeIntervalSince(now)
         let isTurkish = Locale.current.language.languageCode?.identifier.lowercased().starts(with: "tr") ?? true
         
         if diff <= 0 {
-            countdownString = isTurkish ? "Şimdi" : "Happening now"
+            countdownString = isTurkish ? "Şimdi" : "Now"
         } else if diff < 3600 {
             let mins = max(1, Int(diff / 60))
             countdownString = isTurkish ? "\(mins) dk sonra" : "in \(mins)m"

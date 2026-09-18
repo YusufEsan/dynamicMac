@@ -36,12 +36,18 @@ public struct CalendarModuleView: View {
                             .font(.system(size: 11, weight: .medium, design: .rounded))
                             .foregroundColor(.white.opacity(0.8))
                         
-                        Text("•")
-                            .foregroundColor(.white.opacity(0.4))
-                        
-                        Text(calendarManager.countdownString)
-                            .font(.system(size: 11, weight: .bold, design: .rounded))
+                        if !calendarManager.countdownString.isEmpty {
+                            Text("•")
+                                .foregroundColor(.white.opacity(0.4))
+                            
+                            HStack(spacing: 3.5) {
+                                Image(systemName: "calendar")
+                                    .font(.system(size: 9, weight: .semibold))
+                                Text(calendarManager.countdownString)
+                                    .font(.system(size: 11, weight: .bold, design: .rounded))
+                            }
                             .foregroundColor(.orange)
+                        }
                     }
                 } else {
                     Text("No Events Today")

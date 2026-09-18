@@ -139,8 +139,8 @@ public final class NowPlayingManager {
     
     public func startPolling() {
         pollTimer?.invalidate()
-        // Poll every 2.0s for lightweight state updates
-        pollTimer = Timer.scheduledTimer(withTimeInterval: 2.0, repeats: true) { [weak self] _ in
+        // Poll every 1.0s for instant playback state sync
+        pollTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
             self?.refreshPlaybackState()
         }
         
@@ -163,83 +163,46 @@ public final class NowPlayingManager {
         guard !isFetching else { return }
         isFetching = true
         
-        if let getInfo = getInfoFn {
-            getInfo(DispatchQueue.global(qos: .userInitiated)) { [weak self] dict in
-                guard let self = self else { return }
-                defer { self.isFetching = false }
-                
-                if let dict = dict as? [String: Any],
-                   let trackTitle = dict["kMRMediaRemoteNowPlayingInfoTitle"] as? String,
-                   !trackTitle.isEmpty {
-                    
-                    let trackArtist = dict["kMRMediaRemoteNowPlayingInfoArtist"] as? String ?? ""
-                    let trackAlbum = dict["kMRMediaRemoteNowPlayingInfoAlbum"] as? String ?? ""
-                    let trackDuration = dict["kMRMediaRemoteNowPlayingInfoDuration"] as? Double ?? 0.0
-                    let trackElapsed = dict["kMRMediaRemoteNowPlayingInfoElapsedTime"] as? Double ?? 0.0
-                    let rate = dict["kMRMediaRemoteNowPlayingInfoPlaybackRate"] as? Double ?? 0.0
-                    let isMediaPlaying = (rate > 0)
-                    
-                    // Artwork data
-                    var newImage: NSImage? = nil
-                    if let rawData = dict["kMRMediaRemoteNowPlayingInfoArtworkData"] as? Data {
-                        newImage = NSImage(data: rawData)
-                    }
-                    
-                    // Detect Source App
-                    var detectedApp = "Medya"
-                    let lowerArtist = trackArtist.lowercased()
-                    let lowerTitle = trackTitle.lowercased()
-                    
-                    if lowerArtist.contains("youtube") || lowerTitle.contains("youtube") || trackAlbum.lowercased().contains("youtube") {
-                        detectedApp = "YouTube"
-                    } else if self.isAppRunning("com.spotify.client") && (trackDuration > 0 && !lowerArtist.contains("youtube")) {
-                        detectedApp = "Spotify"
-                    } else if self.isAppRunning("com.apple.Music") {
-                        detectedApp = "Music"
-                    } else if self.isAppRunning("com.google.Chrome") {
-                        detectedApp = "Chrome"
-                    }
-                    
-                    DispatchQueue.main.async {
-                        self.isPlaying = isMediaPlaying
-                        self.title = trackTitle
-                        self.artist = trackArtist.isEmpty ? (detectedApp == "Chrome" ? "Film / Dizi (Chrome)" : (detectedApp == "YouTube" ? "YouTube Video" : "")) : trackArtist
-                        self.album = trackAlbum.isEmpty && detectedApp == "Chrome" ? "Web Medya" : trackAlbum
-                        self.duration = trackDuration
-                        self.basePosition = trackElapsed
-                        self.lastTimestamp = Date()
-                        self.playbackRate = isMediaPlaying ? (rate > 0 ? rate : 1.0) : 0.0
-                        self.activePlayerName = detectedApp
-                        
-                        if let img = newImage {
-                            self.artwork = img
-                        } else if self.artwork == nil {
-                            self.fetchArtworkIfNeeded(title: trackTitle, artist: trackArtist)
-                        }
-                    }
-                } else {
-                    // Fallback to AppleScript checks
-                    self.fallbackAppleScriptCheck()
-                }
-            }
-        } else {
-            fallbackAppleScriptCheck()
-        }
-    }
-    
-    private func fallbackAppleScriptCheck() {
-        // Note: isFetching is reset in the individual fetch methods' callbacks
-        
-        // 1. Spotify
+        // 1. Direct check for Spotify if running
         if isAppRunning("com.spotify.client") {
             fetchSpotifyState()
+            return
+        } else if activePlayerName == "Spotify" {
+            // Spotify was quit (Cmd+Q)
+            resetToStopped()
+            self.isFetching = false
+            return
         }
-        // 2. Apple Music
-        else if isAppRunning("com.apple.Music") {
+        
+        // 2. Direct check for Apple Music if running
+        if isAppRunning("com.apple.Music") {
             fetchAppleMusicState()
+            return
+        } else if activePlayerName == "Music" {
+            // Apple Music was quit (Cmd+Q)
+            resetToStopped()
+            self.isFetching = false
+            return
         }
-        // 3. Google Chrome
-        else if isAppRunning("com.google.Chrome") {
+        
+        // 3. Fallback to MediaRemote or Chrome for web players
+        if let isPlayingFn = self.isPlayingFn {
+            isPlayingFn(DispatchQueue.global(qos: .userInitiated)) { [weak self] isSystemPlaying in
+                guard let self = self else { return }
+                
+                if isSystemPlaying, let getInfo = self.getInfoFn {
+                    getInfo(DispatchQueue.global(qos: .userInitiated)) { [weak self] dict in
+                        guard let self = self else { return }
+                        self.handleMediaRemoteDict(dict: dict)
+                    }
+                } else if self.isAppRunning("com.google.Chrome") {
+                    self.fetchChromeMediaState(mediaRemotePlaying: false)
+                } else {
+                    self.resetToStopped()
+                    DispatchQueue.main.async { self.isFetching = false }
+                }
+            }
+        } else if isAppRunning("com.google.Chrome") {
             fetchChromeMediaState(mediaRemotePlaying: false)
         } else {
             resetToStopped()
@@ -247,18 +210,74 @@ public final class NowPlayingManager {
         }
     }
     
+    private func handleMediaRemoteDict(dict: CFDictionary?) {
+        guard let dict = dict as? [String: Any],
+              let trackTitle = dict["kMRMediaRemoteNowPlayingInfoTitle"] as? String,
+              !trackTitle.isEmpty else {
+            if self.isAppRunning("com.google.Chrome") {
+                self.fetchChromeMediaState(mediaRemotePlaying: false)
+            } else {
+                self.resetToStopped()
+                DispatchQueue.main.async { self.isFetching = false }
+            }
+            return
+        }
+        
+        let trackArtist = dict["kMRMediaRemoteNowPlayingInfoArtist"] as? String ?? ""
+        let trackAlbum = dict["kMRMediaRemoteNowPlayingInfoAlbum"] as? String ?? ""
+        let trackDuration = dict["kMRMediaRemoteNowPlayingInfoDuration"] as? Double ?? 0.0
+        let trackElapsed = dict["kMRMediaRemoteNowPlayingInfoElapsedTime"] as? Double ?? 0.0
+        let rate = dict["kMRMediaRemoteNowPlayingInfoPlaybackRate"] as? Double ?? 0.0
+        let isMediaPlaying = (rate > 0)
+        
+        var newImage: NSImage? = nil
+        if let rawData = dict["kMRMediaRemoteNowPlayingInfoArtworkData"] as? Data {
+            newImage = NSImage(data: rawData)
+        }
+        
+        var detectedApp = "Medya"
+        let lowerArtist = trackArtist.lowercased()
+        let lowerTitle = trackTitle.lowercased()
+        
+        if lowerArtist.contains("youtube") || lowerTitle.contains("youtube") || trackAlbum.lowercased().contains("youtube") {
+            detectedApp = "YouTube"
+        } else if self.isAppRunning("com.google.Chrome") {
+            detectedApp = "Chrome"
+        }
+        
+        DispatchQueue.main.async {
+            defer { self.isFetching = false }
+            self.isPlaying = isMediaPlaying
+            self.title = trackTitle
+            self.artist = trackArtist.isEmpty ? (detectedApp == "Chrome" ? "Film / Dizi (Chrome)" : (detectedApp == "YouTube" ? "YouTube Video" : "")) : trackArtist
+            self.album = trackAlbum.isEmpty && detectedApp == "Chrome" ? "Web Medya" : trackAlbum
+            self.duration = trackDuration
+            self.basePosition = trackElapsed
+            self.lastTimestamp = Date()
+            self.playbackRate = isMediaPlaying ? (rate > 0 ? rate : 1.0) : 0.0
+            self.activePlayerName = detectedApp
+            
+            if let img = newImage {
+                self.artwork = img
+            } else if self.artwork == nil {
+                self.fetchArtworkIfNeeded(title: trackTitle, artist: trackArtist)
+            }
+        }
+    }
+    
     private func resetToStopped() {
         DispatchQueue.main.async { [weak self] in
-            if self?.isPlaying == true {
-                self?.isPlaying = false
-                self?.title = "Müzik Çalmıyor"
-                self?.artist = ""
-                self?.artwork = nil
-                self?.duration = 0
-                self?.basePosition = 0
-                self?.playbackRate = 0
-                self?.dominantColor = Color.pink
-            }
+            guard let self = self else { return }
+            self.isPlaying = false
+            self.title = "Müzik Çalmıyor"
+            self.artist = ""
+            self.album = ""
+            self.artwork = nil
+            self.duration = 0
+            self.basePosition = 0
+            self.playbackRate = 0
+            self.activePlayerName = ""
+            self.dominantColor = Color.pink
         }
     }
     
@@ -522,17 +541,21 @@ public final class NowPlayingManager {
         tell application "Music"
             if it is running then
                 set pState to player state as string
-                if pState is "playing" then
+                set trackName to ""
+                set trackArtist to ""
+                set trackAlbum to ""
+                set trackDuration to 0
+                set trackPosition to 0
+                try
                     set trackName to name of current track
                     set trackArtist to artist of current track
                     set trackAlbum to album of current track
                     set trackDuration to duration of current track
                     set trackPosition to player position
-                    return pState & "|||" & trackName & "|||" & trackArtist & "|||" & trackAlbum & "|||" & (trackDuration as string) & "|||" & (trackPosition as string)
-                else
-                    return pState
-                end if
+                end try
+                return pState & "|||" & trackName & "|||" & trackArtist & "|||" & trackAlbum & "|||" & (trackDuration as string) & "|||" & (trackPosition as string)
             end if
+            return "stopped"
         end tell
         """
         
@@ -545,28 +568,34 @@ public final class NowPlayingManager {
             let parts = result.components(separatedBy: "|||")
             DispatchQueue.main.async {
                 defer { self.isFetching = false }
-                if parts.count >= 6 && parts[0] == "playing" {
+                let pState = parts.first ?? "stopped"
+                if parts.count >= 6 && (pState == "playing" || pState == "paused") {
+                    let isPlayingState = (pState == "playing")
                     let newTitle = parts[1]
                     let newArtist = parts[2]
                     let newAlbum = parts[3]
                     
-                    self.isPlaying = true
-                    self.title = newTitle
-                    self.artist = newArtist
-                    self.album = newAlbum
-                    self.duration = Self.parseNumeric(parts[4])
-                    self.basePosition = Self.parseNumeric(parts[5])
-                    self.lastTimestamp = Date()
-                    self.playbackRate = 1.0
-                    self.activePlayerName = "Music"
-                    
-                    self.fetchArtworkIfNeeded(title: newTitle, artist: newArtist)
-                } else {
-                    if self.isAppRunning("com.google.Chrome") {
-                        self.fetchChromeMediaState(mediaRemotePlaying: false)
-                    } else {
-                        self.isPlaying = false
+                    if !newTitle.isEmpty {
+                        self.isPlaying = isPlayingState
+                        self.title = newTitle
+                        self.artist = newArtist
+                        self.album = newAlbum
+                        self.duration = Self.parseNumeric(parts[4])
+                        self.basePosition = Self.parseNumeric(parts[5])
+                        self.lastTimestamp = Date()
+                        self.playbackRate = isPlayingState ? 1.0 : 0.0
+                        self.activePlayerName = "Music"
+                        
+                        self.fetchArtworkIfNeeded(title: newTitle, artist: newArtist)
+                        return
                     }
+                }
+                
+                if self.isAppRunning("com.google.Chrome") {
+                    self.fetchChromeMediaState(mediaRemotePlaying: false)
+                } else {
+                    self.isPlaying = false
+                    self.playbackRate = 0.0
                 }
             }
         }
@@ -577,21 +606,23 @@ public final class NowPlayingManager {
         tell application "Spotify"
             if it is running then
                 set pState to player state as string
-                if pState is "playing" then
+                set trackName to ""
+                set trackArtist to ""
+                set trackAlbum to ""
+                set rawDuration to 0
+                set trackPosition to 0
+                set artUrl to ""
+                try
                     set trackName to name of current track
                     set trackArtist to artist of current track
                     set trackAlbum to album of current track
                     set rawDuration to duration of current track
                     set trackPosition to player position
-                    set artUrl to ""
-                    try
-                        set artUrl to artwork url of current track
-                    end try
-                    return pState & "|||" & trackName & "|||" & trackArtist & "|||" & trackAlbum & "|||" & (rawDuration as string) & "|||" & (trackPosition as string) & "|||" & artUrl
-                else
-                    return pState
-                end if
+                    set artUrl to artwork url of current track
+                end try
+                return pState & "|||" & trackName & "|||" & trackArtist & "|||" & trackAlbum & "|||" & (rawDuration as string) & "|||" & (trackPosition as string) & "|||" & artUrl
             end if
+            return "stopped"
         end tell
         """
         executeAppleScript(script) { [weak self] result in
@@ -603,36 +634,42 @@ public final class NowPlayingManager {
             let parts = result.components(separatedBy: "|||")
             DispatchQueue.main.async {
                 defer { self.isFetching = false }
-                if parts.count >= 6 && parts[0] == "playing" {
+                let pState = parts.first ?? "stopped"
+                if parts.count >= 6 && (pState == "playing" || pState == "paused") {
+                    let isPlayingState = (pState == "playing")
                     let newTitle = parts[1]
                     let newArtist = parts[2]
                     let newAlbum = parts[3]
                     
-                    self.isPlaying = true
-                    self.title = newTitle
-                    self.artist = newArtist
-                    self.album = newAlbum
-                    
-                    let rawDur = Self.parseNumeric(parts[4])
-                    self.duration = rawDur > 10000 ? (rawDur / 1000.0) : rawDur
-                    self.basePosition = Self.parseNumeric(parts[5])
-                    self.lastTimestamp = Date()
-                    self.playbackRate = 1.0
-                    self.activePlayerName = "Spotify"
-                    
-                    if parts.count > 6 && !parts[6].isEmpty, let url = URL(string: parts[6]) {
-                        self.downloadImage(from: url)
-                    } else {
-                        self.fetchArtworkIfNeeded(title: newTitle, artist: newArtist)
+                    if !newTitle.isEmpty {
+                        self.isPlaying = isPlayingState
+                        self.title = newTitle
+                        self.artist = newArtist
+                        self.album = newAlbum
+                        
+                        let rawDur = Self.parseNumeric(parts[4])
+                        self.duration = rawDur > 10000 ? (rawDur / 1000.0) : rawDur
+                        self.basePosition = Self.parseNumeric(parts[5])
+                        self.lastTimestamp = Date()
+                        self.playbackRate = isPlayingState ? 1.0 : 0.0
+                        self.activePlayerName = "Spotify"
+                        
+                        if parts.count > 6 && !parts[6].isEmpty, let url = URL(string: parts[6]) {
+                            self.downloadImage(from: url)
+                        } else {
+                            self.fetchArtworkIfNeeded(title: newTitle, artist: newArtist)
+                        }
+                        return
                     }
+                }
+                
+                if self.isAppRunning("com.google.Chrome") {
+                    self.fetchChromeMediaState(mediaRemotePlaying: false)
+                } else if self.isAppRunning("com.apple.Music") {
+                    self.fetchAppleMusicState()
                 } else {
-                    if self.isAppRunning("com.google.Chrome") {
-                        self.fetchChromeMediaState(mediaRemotePlaying: false)
-                    } else if self.isAppRunning("com.apple.Music") {
-                        self.fetchAppleMusicState()
-                    } else {
-                        self.isPlaying = false
-                    }
+                    self.isPlaying = false
+                    self.playbackRate = 0.0
                 }
             }
         }

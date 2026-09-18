@@ -11,7 +11,7 @@ public struct IslandView: View {
     private var permissions = PermissionManager.shared
     
     @State private var isHovering = false
-    @State private var activeTopTab: String = "Nook"
+    @State private var activeTopTab: String = "Music"
     @State private var settingsSubTab: String = "FaceID"
     @State private var showEnrollmentSheet: Bool = false
     @State private var unlockPasswordInput: String = ""
@@ -32,11 +32,11 @@ public struct IslandView: View {
     
     public init(
         isTopAttached: Bool = true,
-        initialTab: String = "Nook",
+        initialTab: String = "Music",
         initialSettingsSubTab: String = "FaceID"
     ) {
         self.isTopAttached = isTopAttached
-        self._activeTopTab = State(initialValue: initialTab)
+        self._activeTopTab = State(initialValue: initialTab == "Nook" ? "Music" : initialTab)
         self._settingsSubTab = State(initialValue: initialSettingsSubTab)
     }
     
@@ -253,7 +253,7 @@ public struct IslandView: View {
                             .foregroundColor(.white.opacity(0.85))
                     }
                 }
-            } else if music.isPlaying || (!music.title.isEmpty && music.title != "Müzik Çalmıyor") {
+            } else if music.isPlaying {
                 if let art = music.artwork {
                     ZStack(alignment: .bottomTrailing) {
                         Image(nsImage: art)
@@ -322,7 +322,7 @@ public struct IslandView: View {
                             .font(.system(size: 11.5, weight: .semibold, design: .rounded))
                             .foregroundColor(.white.opacity(0.85))
                     }
-                } else if music.isPlaying || (!music.title.isEmpty && music.title != "Müzik Çalmıyor") {
+                } else if music.isPlaying {
                     HStack(spacing: 4) {
                         Text(music.title)
                             .font(.system(size: 11.5, weight: .semibold, design: .rounded))
@@ -381,9 +381,9 @@ public struct IslandView: View {
                 }
             } else if music.isPlaying {
                 animatedEqualizer(barCount: 4, height: 13)
-            } else if calendarManager.nextEvent != nil {
-                Text(calendarManager.countdownString)
-                    .font(.system(size: 10, weight: .bold, design: .monospaced))
+            } else if let next = calendarManager.nextEvent, (Calendar.current.isDateInToday(next.startDate) || (next.startDate <= Date() && next.endDate > Date())) {
+                Image(systemName: "calendar")
+                    .font(.system(size: 11, weight: .semibold))
                     .foregroundColor(.orange)
             }
         }

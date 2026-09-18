@@ -11,14 +11,12 @@ struct FaceIslandApp: App {
                 NotificationCenter.default.post(name: NSNotification.Name("FaceIsland_OpenInIslandSettings"), object: nil)
                 IslandContentProvider.shared.expand(to: .faceID)
             }
-            .keyboardShortcut(",", modifiers: .command)
             
             Divider()
             
             Button("Çıkış") {
                 NSApplication.shared.terminate(nil)
             }
-            .keyboardShortcut("q", modifiers: .command)
         }
     }
 }
