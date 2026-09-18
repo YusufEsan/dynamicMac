@@ -274,13 +274,6 @@ public struct SettingsView: View {
                         .foregroundColor(.secondary)
                 }
             }
-            
-            Section("Widget & Ekran Entegrasyonu") {
-                Toggle("Face ID Widget Senkronizasyonu", isOn: $settings.isWidgetSyncEnabled)
-                Text("Masaüstü ve kilit ekranı widget'ına anlık yüz tarama animasyonu ve durumunu iletir.")
-                    .font(.caption2)
-                    .foregroundColor(.secondary)
-            }
         }
     }
     

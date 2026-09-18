@@ -24,6 +24,10 @@ public struct IslandView: View {
     @State private var radarRotation: Double = 0
     @State private var pulseGlow: Bool = false
     
+    @State private var selectedDate: Date = Date()
+    @State private var calendarWeekOffset: Int = 0
+    @State private var selectedDayEventIndex: Int = 0
+    
     public var isTopAttached: Bool
     
     public init(isTopAttached: Bool = true) {
@@ -140,6 +144,11 @@ public struct IslandView: View {
             updateVisualDimensions()
         }
         .onChange(of: activeTopTab) {
+            if activeTopTab == "Calendar" {
+                Task {
+                    await CalendarManager.shared.fetchEvents()
+                }
+            }
             updateVisualDimensions()
         }
         .onChange(of: settingsSubTab) {
@@ -1045,85 +1054,254 @@ public struct IslandView: View {
     private var calendarDateStripSection: some View {
         let calendar = Calendar.current
         let today = Date()
+        let baseDate = calendar.date(byAdding: .day, value: calendarWeekOffset, to: today) ?? today
         
         let monthFormatter = DateFormatter()
         monthFormatter.locale = Locale(identifier: "tr_TR")
         monthFormatter.dateFormat = "MMMM"
-        let currentMonth = monthFormatter.string(from: today).capitalized
-        let currentDayNum = calendar.component(.day, from: today)
+        let displayedMonth = monthFormatter.string(from: selectedDate).capitalized
+        let displayedYear = calendar.component(.year, from: selectedDate)
         
+        let isSelectedToday = calendar.isDate(selectedDate, inSameDayAs: today)
+        let selectedDayEvents = calendarManager.events(for: selectedDate)
         let dayNamesTR = ["Pzt", "Sal", "Çar", "Per", "Cum", "Cmt", "Paz"]
         
-        return HStack(alignment: .center, spacing: 20) {
-            // Month Title & Year + Event Pill
-            VStack(alignment: .leading, spacing: 6) {
-                VStack(alignment: .leading, spacing: 0) {
-                    Text(currentMonth)
-                        .font(.system(size: 20, weight: .black, design: .rounded))
+        return HStack(alignment: .center, spacing: 12) {
+            // Left Column: Selected Month, Year, "Bugün" Jump Button & Selected Day Event Pill
+            VStack(alignment: .leading, spacing: 5) {
+                HStack(alignment: .firstTextBaseline, spacing: 6) {
+                    Text(displayedMonth)
+                        .font(.system(size: 18, weight: .black, design: .rounded))
                         .foregroundColor(.white)
                     
-                    Text(String(format: "%d", calendar.component(.year, from: today)))
+                    Text(String(format: "%d", displayedYear))
                         .font(.system(size: 11, weight: .semibold, design: .rounded))
                         .foregroundColor(.white.opacity(0.45))
+                    
+                    Spacer()
+                    
+                    if !isSelectedToday || calendarWeekOffset != 0 {
+                        Button(action: {
+                            withAnimation(.spring(response: 0.28, dampingFraction: 0.75)) {
+                                selectedDate = today
+                                selectedDayEventIndex = 0
+                                calendarWeekOffset = 0
+                            }
+                        }) {
+                            Text("Bugün")
+                                .font(.system(size: 9, weight: .bold, design: .rounded))
+                                .foregroundColor(.cyan)
+                                .padding(.horizontal, 6)
+                                .padding(.vertical, 2)
+                                .background(Color.cyan.opacity(0.18))
+                                .clipShape(Capsule())
+                        }
+                        .buttonStyle(.plain)
+                    }
                 }
                 
-                HStack(spacing: 4) {
-                    Image(systemName: calendarManager.nextEvent != nil ? "calendar.badge.clock" : "calendar")
-                        .font(.system(size: 9))
-                        .foregroundColor(calendarManager.nextEvent != nil ? .orange : .white.opacity(0.45))
-                    
-                    if let next = calendarManager.nextEvent {
-                        Text("\(next.title) • \(calendarManager.countdownString)")
-                            .font(.system(size: 9.5, weight: .semibold, design: .rounded))
-                            .foregroundColor(.orange)
-                    } else {
-                        Text("Bugün etkinlik yok")
+                // Event Card for Selected Day (Clicking cycles through all events if multiple exist)
+                let activeEventIndex = selectedDayEvents.indices.contains(selectedDayEventIndex) ? selectedDayEventIndex : 0
+                
+                if let event = (selectedDayEvents.isEmpty ? nil : selectedDayEvents[activeEventIndex]) {
+                    Button(action: {
+                        if selectedDayEvents.count > 1 {
+                            withAnimation(.spring(response: 0.25, dampingFraction: 0.8)) {
+                                selectedDayEventIndex = (activeEventIndex + 1) % selectedDayEvents.count
+                            }
+                        }
+                    }) {
+                        HStack(spacing: 5) {
+                            Image(systemName: "calendar.badge.clock")
+                                .font(.system(size: 9.5))
+                                .foregroundColor(.orange)
+                            
+                            VStack(alignment: .leading, spacing: 1) {
+                                Text(event.title)
+                                    .font(.system(size: 9.5, weight: .semibold, design: .rounded))
+                                    .foregroundColor(.white)
+                                    .lineLimit(1)
+                                
+                                HStack(spacing: 4) {
+                                    Text(event.formattedStartTime)
+                                        .font(.system(size: 8.5, weight: .bold, design: .rounded))
+                                        .foregroundColor(.orange.opacity(0.95))
+                                    
+                                    if selectedDayEvents.count > 1 {
+                                        Text("\(activeEventIndex + 1)/\(selectedDayEvents.count)")
+                                            .font(.system(size: 8, weight: .heavy, design: .rounded))
+                                            .foregroundColor(.white.opacity(0.70))
+                                            .padding(.horizontal, 4)
+                                            .padding(.vertical, 1)
+                                            .background(Color.white.opacity(0.12))
+                                            .clipShape(Capsule())
+                                    }
+                                }
+                            }
+                            
+                            Spacer(minLength: 2)
+                            
+                            if let url = event.meetingURL {
+                                Button(action: {
+                                    NSWorkspace.shared.open(url)
+                                }) {
+                                    Image(systemName: "video.fill")
+                                        .font(.system(size: 8.5))
+                                        .foregroundColor(.white)
+                                        .padding(4)
+                                        .background(Color.green.opacity(0.85))
+                                        .clipShape(Circle())
+                                }
+                                .buttonStyle(.plain)
+                            } else if selectedDayEvents.count > 1 {
+                                Image(systemName: "chevron.right")
+                                    .font(.system(size: 8, weight: .bold))
+                                    .foregroundColor(.white.opacity(0.45))
+                            }
+                        }
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .background(Color.white.opacity(0.08))
+                        .clipShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 7, style: .continuous)
+                                .stroke(selectedDayEvents.count > 1 ? Color.orange.opacity(0.30) : Color.white.opacity(0.04), lineWidth: 1)
+                        )
+                    }
+                    .buttonStyle(.plain)
+                } else if !permissions.calendarGranted {
+                    Button(action: {
+                        Task {
+                            _ = await permissions.requestCalendarAccess()
+                            await calendarManager.fetchEvents()
+                        }
+                    }) {
+                        HStack(spacing: 4) {
+                            Image(systemName: "lock.shield.fill")
+                                .font(.system(size: 9))
+                                .foregroundColor(.orange)
+                            Text("Takvim İzni Ver")
+                                .font(.system(size: 9.5, weight: .bold, design: .rounded))
+                                .foregroundColor(.orange)
+                        }
+                    }
+                    .buttonStyle(.plain)
+                } else {
+                    HStack(spacing: 5) {
+                        Image(systemName: "calendar")
+                            .font(.system(size: 9))
+                            .foregroundColor(.white.opacity(0.4))
+                        
+                        Text(isSelectedToday ? "Bugün etkinlik yok" : "Bu güne ait etkinlik yok")
                             .font(.system(size: 9.5, weight: .regular, design: .rounded))
                             .foregroundColor(.white.opacity(0.55))
                     }
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(Color.white.opacity(0.08))
+                    .clipShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
                 }
-                .padding(.horizontal, 8)
-                .padding(.vertical, 3)
-                .background(Color.white.opacity(0.08))
-                .clipShape(Capsule())
             }
-            .frame(width: 170, alignment: .leading)
+            .frame(width: 175, alignment: .leading)
             
-            Spacer()
+            Spacer(minLength: 4)
             
-            // Full 7-Day Strip
-            HStack(spacing: 8) {
-                ForEach(-3...3, id: \.self) { offset in
-                    if let date = calendar.date(byAdding: .day, value: offset, to: today) {
-                        let day = calendar.component(.day, from: date)
-                        let isToday = (day == currentDayNum)
-                        let weekdayIndex = max(0, min(6, (calendar.component(.weekday, from: date) + 5) % 7))
-                        let name = dayNamesTR[weekdayIndex]
-                        let isWeekend = (weekdayIndex == 5 || weekdayIndex == 6)
-                        
-                        VStack(spacing: 3) {
-                            Text(name)
-                                .font(.system(size: 9, weight: isToday ? .bold : .medium))
-                                .foregroundColor(isToday ? .white : (isWeekend ? Color.red.opacity(0.85) : Color.white.opacity(0.5)))
+            // Right Column: Navigation Chevrons + 7-Day Interactive Strip
+            HStack(spacing: 5) {
+                // Previous Week
+                Button(action: {
+                    withAnimation(.spring(response: 0.28, dampingFraction: 0.75)) {
+                        calendarWeekOffset -= 7
+                        selectedDayEventIndex = 0
+                    }
+                }) {
+                    Image(systemName: "chevron.left")
+                        .font(.system(size: 10, weight: .bold))
+                        .foregroundColor(.white.opacity(0.65))
+                        .frame(width: 18, height: 48)
+                        .background(Color.white.opacity(0.06))
+                        .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+                }
+                .buttonStyle(.plain)
+                
+                // 7 Day Strip
+                HStack(spacing: 5) {
+                    ForEach(-3...3, id: \.self) { offset in
+                        if let date = calendar.date(byAdding: .day, value: offset, to: baseDate) {
+                            let day = calendar.component(.day, from: date)
+                            let isToday = calendar.isDateInToday(date)
+                            let isSelected = calendar.isDate(date, inSameDayAs: selectedDate)
+                            let weekdayIndex = max(0, min(6, (calendar.component(.weekday, from: date) + 5) % 7))
+                            let name = dayNamesTR[weekdayIndex]
+                            let isWeekend = (weekdayIndex == 5 || weekdayIndex == 6)
+                            let dayHasEvents = !calendarManager.events(for: date).isEmpty
                             
-                            Text(String(format: "%02d", day))
-                                .font(.system(size: 13, weight: isToday ? .black : .semibold, design: .monospaced))
-                                .foregroundColor(isToday ? .white : (isWeekend ? Color.red.opacity(0.95) : Color.white.opacity(0.85)))
+                            Button(action: {
+                                withAnimation(.spring(response: 0.28, dampingFraction: 0.75)) {
+                                    selectedDate = date
+                                    selectedDayEventIndex = 0
+                                }
+                            }) {
+                                VStack(spacing: 2) {
+                                    Text(name)
+                                        .font(.system(size: 9, weight: isSelected || isToday ? .bold : .medium))
+                                        .foregroundColor(
+                                            isSelected ? .white :
+                                            (isWeekend ? Color.red.opacity(0.85) : Color.white.opacity(0.55))
+                                        )
+                                    
+                                    Text(String(format: "%02d", day))
+                                        .font(.system(size: 13, weight: isSelected ? .black : (isToday ? .bold : .semibold), design: .monospaced))
+                                        .foregroundColor(
+                                            isSelected ? .white :
+                                            (isWeekend ? Color.red.opacity(0.95) : Color.white.opacity(0.90))
+                                        )
+                                    
+                                    // Event / Today Indicator dot
+                                    Circle()
+                                        .fill(isSelected ? Color.white : (dayHasEvents ? Color.orange : (isToday ? Color.cyan : Color.clear)))
+                                        .frame(width: 3.5, height: 3.5)
+                                }
+                                .frame(width: 33, height: 48)
+                                .background(
+                                    isSelected ?
+                                    LinearGradient(colors: [Color.blue, Color(red: 0.1, green: 0.45, blue: 0.95)], startPoint: .top, endPoint: .bottom) :
+                                    (isToday ?
+                                     LinearGradient(colors: [Color.blue.opacity(0.25), Color.blue.opacity(0.10)], startPoint: .top, endPoint: .bottom) :
+                                     LinearGradient(colors: [Color.white.opacity(0.08), Color.white.opacity(0.04)], startPoint: .top, endPoint: .bottom))
+                                )
+                                .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                                        .stroke(
+                                            isSelected ? Color.cyan.opacity(0.8) :
+                                            (isToday ? Color.blue.opacity(0.5) : Color.white.opacity(0.10)),
+                                            lineWidth: isSelected ? 1.5 : 1
+                                        )
+                                )
+                                .shadow(color: isSelected ? Color.blue.opacity(0.45) : Color.clear, radius: 4, y: 1)
+                            }
+                            .buttonStyle(.plain)
                         }
-                        .frame(width: 36, height: 48)
-                        .background(
-                            isToday ?
-                            LinearGradient(colors: [Color.blue, Color(red: 0.1, green: 0.45, blue: 0.95)], startPoint: .top, endPoint: .bottom) :
-                            LinearGradient(colors: [Color.white.opacity(0.08), Color.white.opacity(0.04)], startPoint: .top, endPoint: .bottom)
-                        )
-                        .clipShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 9, style: .continuous)
-                                .stroke(isToday ? Color.cyan.opacity(0.7) : Color.white.opacity(0.10), lineWidth: 1)
-                        )
-                        .shadow(color: isToday ? Color.blue.opacity(0.4) : Color.clear, radius: 4, y: 1)
                     }
                 }
+                
+                // Next Week
+                Button(action: {
+                    withAnimation(.spring(response: 0.28, dampingFraction: 0.75)) {
+                        calendarWeekOffset += 7
+                    }
+                }) {
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 10, weight: .bold))
+                        .foregroundColor(.white.opacity(0.65))
+                        .frame(width: 18, height: 48)
+                        .background(Color.white.opacity(0.06))
+                        .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+                }
+                .buttonStyle(.plain)
             }
         }
     }
@@ -1256,7 +1434,7 @@ public struct IslandView: View {
             case "Permissions":
                 return 114
             default: // "FaceID"
-                return 184
+                return 138
             }
         case "Calendar":
             return 68
@@ -1282,7 +1460,7 @@ public struct IslandView: View {
             case "Permissions":
                 return 178
             default: // "FaceID"
-                return 248
+                return 202
             }
         case "Calendar":
             return 132
@@ -1478,7 +1656,7 @@ public struct IslandView: View {
             
             // Row 3: Çentikte Video Oynatıcı Toggle
             Button(action: {
-                withAnimation(AnimationConstants.quickInteractive) {
+                withAnimation(.spring(response: 0.20, dampingFraction: 0.8)) {
                     settings.enableNotchVideoPlayer.toggle()
                 }
             }) {
@@ -1505,18 +1683,18 @@ public struct IslandView: View {
                     
                     Spacer()
                     
-                    ZStack(alignment: settings.enableNotchVideoPlayer ? .trailing : .leading) {
+                    ZStack(alignment: .leading) {
                         Capsule()
                             .fill(settings.enableNotchVideoPlayer ? Color(red: 0.11, green: 0.84, blue: 0.38) : Color.white.opacity(0.18))
-                            .frame(width: 32, height: 18)
+                            .frame(width: 34, height: 18)
                             .shadow(color: settings.enableNotchVideoPlayer ? Color.green.opacity(0.4) : Color.clear, radius: 2)
                         
                         Circle()
                             .fill(Color.white)
                             .frame(width: 14, height: 14)
-                            .padding(2)
+                            .offset(x: settings.enableNotchVideoPlayer ? 18 : 2)
                     }
-                    .animation(.spring(response: 0.25, dampingFraction: 0.7), value: settings.enableNotchVideoPlayer)
+                    .frame(width: 34, height: 18)
                 }
                 .padding(10)
                 .background(settings.enableNotchVideoPlayer ? Color.green.opacity(0.12) : Color.white.opacity(0.04))
@@ -1805,55 +1983,6 @@ public struct IslandView: View {
                 RoundedRectangle(cornerRadius: 8, style: .continuous)
                     .stroke(Color.white.opacity(0.08), lineWidth: 1)
             )
-            
-            // Row 4: Widget Live Sync Toggle Card
-            Button(action: {
-                withAnimation(.spring(response: 0.28, dampingFraction: 0.7)) {
-                    settings.isWidgetSyncEnabled.toggle()
-                }
-            }) {
-                HStack(spacing: 8) {
-                    Image(systemName: "square.grid.2x2.fill")
-                        .font(.system(size: 11))
-                        .foregroundColor(settings.isWidgetSyncEnabled ? Color(red: 0.11, green: 0.84, blue: 0.38) : .white.opacity(0.5))
-                        .frame(width: 24, height: 24)
-                        .background(settings.isWidgetSyncEnabled ? Color.green.opacity(0.20) : Color.white.opacity(0.08))
-                        .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
-                    
-                    VStack(alignment: .leading, spacing: 1) {
-                        Text("Widget Canlı Senkronizasyonu")
-                            .font(.system(size: 11, weight: .semibold, design: .rounded))
-                            .foregroundColor(.white.opacity(0.92))
-                        Text(settings.isWidgetSyncEnabled ? "Aktif (Canlı Animasyon & Durum İletiliyor)" : "Devre Dışı")
-                            .font(.system(size: 9.5))
-                            .foregroundColor(settings.isWidgetSyncEnabled ? Color(red: 0.11, green: 0.84, blue: 0.38) : .white.opacity(0.45))
-                    }
-                    
-                    Spacer(minLength: 4)
-                    
-                    ZStack(alignment: settings.isWidgetSyncEnabled ? .trailing : .leading) {
-                        Capsule()
-                            .fill(settings.isWidgetSyncEnabled ? Color(red: 0.11, green: 0.84, blue: 0.38) : Color.white.opacity(0.20))
-                            .frame(width: 30, height: 17)
-                            .shadow(color: settings.isWidgetSyncEnabled ? Color.green.opacity(0.5) : Color.clear, radius: 3)
-                        
-                        Circle()
-                            .fill(Color.white)
-                            .frame(width: 13, height: 13)
-                            .padding(2)
-                    }
-                }
-                .padding(.horizontal, 10)
-                .padding(.vertical, 6)
-                .frame(maxWidth: .infinity)
-                .background(Color.white.opacity(0.05))
-                .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 8, style: .continuous)
-                        .stroke(settings.isWidgetSyncEnabled ? Color.green.opacity(0.3) : Color.white.opacity(0.08), lineWidth: 1)
-                )
-            }
-            .buttonStyle(.plain)
         }
         .frame(maxWidth: .infinity)
     }

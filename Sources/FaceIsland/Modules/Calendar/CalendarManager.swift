@@ -2,7 +2,7 @@ import Foundation
 import EventKit
 import AppKit
 
-public struct CalendarEventItem: Identifiable, Equatable {
+public struct CalendarEventItem: Identifiable, Equatable, Sendable {
     public let id: String
     public let title: String
     public let startDate: Date
@@ -35,6 +35,23 @@ public final class CalendarManager {
     
     private init() {
         startTimer()
+        
+        // Listen to macOS EventKit real-time change notifications (new event, edits, iCloud sync)
+        NotificationCenter.default.addObserver(forName: .EKEventStoreChanged, object: nil, queue: .main) { [weak self] _ in
+            self?.eventStore.refreshSourcesIfNecessary()
+            Task {
+                await self?.fetchEvents()
+            }
+        }
+        
+        // Listen to app activation / window focus
+        NotificationCenter.default.addObserver(forName: NSApplication.didBecomeActiveNotification, object: nil, queue: .main) { [weak self] _ in
+            self?.eventStore.refreshSourcesIfNecessary()
+            Task {
+                await self?.fetchEvents()
+            }
+        }
+        
         Task {
             await fetchEvents()
         }
@@ -42,7 +59,7 @@ public final class CalendarManager {
     
     public func startTimer() {
         updateTimer?.invalidate()
-        updateTimer = Timer.scheduledTimer(withTimeInterval: 30.0, repeats: true) { [weak self] _ in
+        updateTimer = Timer.scheduledTimer(withTimeInterval: 5.0, repeats: true) { [weak self] _ in
             Task {
                 await self?.fetchEvents()
             }
@@ -50,15 +67,29 @@ public final class CalendarManager {
     }
     
     public func fetchEvents() async {
-        guard PermissionManager.shared.calendarGranted else { return }
+        let status = EKEventStore.authorizationStatus(for: .event)
+        if status == .notDetermined {
+            _ = await PermissionManager.shared.requestCalendarAccess()
+        } else {
+            PermissionManager.shared.checkCalendar()
+        }
         
-        let calendars = eventStore.calendars(for: .event)
+        let verifiedStatus = EKEventStore.authorizationStatus(for: .event)
+        let isAuthorized = (verifiedStatus == .fullAccess || verifiedStatus == .writeOnly || verifiedStatus == .authorized || !eventStore.calendars(for: .event).isEmpty)
+        
+        guard isAuthorized else {
+            return
+        }
+        
+        eventStore.refreshSourcesIfNecessary()
+        
         let now = Date()
-        let endOfDay = Calendar.current.date(byAdding: .hour, value: 24, to: now) ?? now.addingTimeInterval(86400)
+        let startPeriod = Calendar.current.date(byAdding: .day, value: -60, to: now) ?? now.addingTimeInterval(-86400 * 60)
+        let endPeriod = Calendar.current.date(byAdding: .day, value: 60, to: now) ?? now.addingTimeInterval(86400 * 60)
         
-        let predicate = eventStore.predicateForEvents(withStart: now.addingTimeInterval(-1800), end: endOfDay, calendars: calendars)
+        let allCalendars = eventStore.calendars(for: .event)
+        let predicate = eventStore.predicateForEvents(withStart: startPeriod, end: endPeriod, calendars: allCalendars.isEmpty ? nil : allCalendars)
         let ekEvents = eventStore.events(matching: predicate)
-            .filter { $0.endDate > now }
             .sorted { $0.startDate < $1.startDate }
         
         var items: [CalendarEventItem] = []
@@ -74,7 +105,7 @@ public final class CalendarManager {
             
             items.append(CalendarEventItem(
                 id: event.eventIdentifier,
-                title: event.title ?? "Untitled Event",
+                title: event.title ?? "Etkinlik",
                 startDate: event.startDate,
                 endDate: event.endDate,
                 isAllDay: event.isAllDay,
@@ -83,29 +114,48 @@ public final class CalendarManager {
             ))
         }
         
+        let finalItems = items
         await MainActor.run {
-            self.upcomingEvents = items
-            self.nextEvent = items.first
+            self.upcomingEvents = finalItems
+            self.nextEvent = finalItems.first(where: { $0.endDate > now })
             self.updateCountdown()
+        }
+    }
+    
+    public func events(for date: Date) -> [CalendarEventItem] {
+        let calendar = Calendar.current
+        let dayStart = calendar.startOfDay(for: date)
+        guard let dayEnd = calendar.date(byAdding: .day, value: 1, to: dayStart) else { return [] }
+        
+        return upcomingEvents.filter { item in
+            calendar.isDate(item.startDate, inSameDayAs: date) ||
+            calendar.isDate(item.endDate, inSameDayAs: date) ||
+            (item.startDate < dayEnd && item.endDate > dayStart)
         }
     }
     
     private func updateCountdown() {
         guard let next = nextEvent else {
-            countdownString = "No upcoming events"
+            countdownString = ""
             return
         }
         
         let diff = next.startDate.timeIntervalSince(Date())
+        let isTurkish = Locale.current.language.languageCode?.identifier.lowercased().starts(with: "tr") ?? true
+        
         if diff <= 0 {
-            countdownString = "Happening now"
+            countdownString = isTurkish ? "Şimdi" : "Happening now"
         } else if diff < 3600 {
-            let mins = Int(diff / 60)
-            countdownString = "in \(mins)m"
+            let mins = max(1, Int(diff / 60))
+            countdownString = isTurkish ? "\(mins) dk sonra" : "in \(mins)m"
         } else {
             let hours = Int(diff / 3600)
             let mins = Int((diff.truncatingRemainder(dividingBy: 3600)) / 60)
-            countdownString = "in \(hours)h \(mins)m"
+            if mins == 0 {
+                countdownString = isTurkish ? "\(hours) sa sonra" : "in \(hours)h"
+            } else {
+                countdownString = isTurkish ? "\(hours) sa \(mins) dk sonra" : "in \(hours)h \(mins)m"
+            }
         }
     }
     

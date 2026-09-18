@@ -13,6 +13,12 @@ public final class PermissionManager {
     
     private init() {
         checkAll()
+        NotificationCenter.default.addObserver(forName: NSApplication.didBecomeActiveNotification, object: nil, queue: .main) { [weak self] _ in
+            self?.checkAll()
+        }
+        NSWorkspace.shared.notificationCenter.addObserver(forName: NSWorkspace.didWakeNotification, object: nil, queue: .main) { [weak self] _ in
+            self?.checkAll()
+        }
     }
     
     public func checkAll() {
@@ -52,14 +58,35 @@ public final class PermissionManager {
     
     public func checkCalendar() {
         let status = EKEventStore.authorizationStatus(for: .event)
-        if #available(macOS 14.0, *) {
-            calendarGranted = (status == .fullAccess || status == .writeOnly)
-        } else {
-            calendarGranted = (status == .authorized)
+        var isGranted = (status == .fullAccess || status == .writeOnly || status == .authorized)
+        
+        if !isGranted {
+            let store = EKEventStore()
+            if !store.calendars(for: .event).isEmpty {
+                isGranted = true
+            }
+        }
+        
+        if calendarGranted != isGranted {
+            calendarGranted = isGranted
+            if isGranted {
+                Task {
+                    await CalendarManager.shared.fetchEvents()
+                }
+            }
         }
     }
     
     public func requestCalendarAccess() async -> Bool {
+        let store = EKEventStore()
+        if !store.calendars(for: .event).isEmpty {
+            await MainActor.run {
+                self.calendarGranted = true
+                Task { await CalendarManager.shared.fetchEvents() }
+            }
+            return true
+        }
+        
         let status = EKEventStore.authorizationStatus(for: .event)
         if status == .denied || status == .restricted {
             await MainActor.run {
@@ -68,33 +95,39 @@ public final class PermissionManager {
             return false
         }
         
-        let store = EKEventStore()
         do {
+            var granted = false
             if #available(macOS 14.0, *) {
-                let granted = try await store.requestFullAccessToEvents()
-                await MainActor.run {
-                    self.calendarGranted = granted
-                    if !granted {
-                        self.openSettings(for: .calendar)
-                    }
-                }
-                return granted
+                granted = try await store.requestFullAccessToEvents()
             } else {
-                let granted = try await store.requestAccess(to: .event)
-                await MainActor.run {
-                    self.calendarGranted = granted
-                    if !granted {
-                        self.openSettings(for: .calendar)
-                    }
-                }
-                return granted
+                granted = try await store.requestAccess(to: .event)
             }
+            
+            let verifiedStatus = EKEventStore.authorizationStatus(for: .event)
+            if verifiedStatus == .fullAccess || verifiedStatus == .writeOnly || verifiedStatus == .authorized || !store.calendars(for: .event).isEmpty {
+                granted = true
+            }
+            
+            let finalGranted = granted
+            await MainActor.run {
+                self.calendarGranted = finalGranted
+                if finalGranted {
+                    Task {
+                        await CalendarManager.shared.fetchEvents()
+                    }
+                } else {
+                    self.openSettings(for: .calendar)
+                }
+            }
+            return finalGranted
         } catch {
             await MainActor.run {
-                self.calendarGranted = false
-                self.openSettings(for: .calendar)
+                self.checkCalendar()
+                if !self.calendarGranted {
+                    self.openSettings(for: .calendar)
+                }
             }
-            return false
+            return self.calendarGranted
         }
     }
     
