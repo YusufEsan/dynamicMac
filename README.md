@@ -105,7 +105,7 @@
 ## Kurulum (Installation)
 
 ### Yöntem 1: DMG ile Kolay Kurulum (Önerilen)
-1. [GitHub Releases](https://github.com/yusufesan/dynamicMac/releases/latest) sayfasından **`FaceIsland.dmg`** (veya `FaceIsland.zip`) dosyasını indirin.
+1. [GitHub Releases](https://github.com/yusufesan/dynamicMac/releases/latest) sayfasından **`FaceIsland.dmg`** dosyasını indirin.
 2. `FaceIsland.dmg` dosyasını açıp `FaceIsland.app` simgesini `Applications` (Uygulamalar) klasörüne sürükleyin.
 3. Uygulamayı başlatın.
 
