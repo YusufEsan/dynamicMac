@@ -56,7 +56,7 @@
 
 <p align="center">
   <b>8. Kompakt Çentik Bildirim ve Geri Sayım Durumu</b><br><br>
-  <img src="assets/screenshots/08_compact_notch.png" width="400" alt="Kompakt Çentik Görünümü" />
+  <img src="assets/screenshots/08_compact_notch.png" width="600" alt="Kompakt Çentik Görünümü" />
 </p>
 
 <p align="center">
@@ -66,7 +66,7 @@
 
 <p align="center">
   <b>10. Yüzen Kapsül (Floating Capsule) Serbest Ada Modu</b><br><br>
-  <img src="assets/screenshots/10_floating_capsule.png" width="400" alt="Yüzen Kapsül Modu" />
+  <img src="assets/screenshots/10_floating_capsule.png" width="600" alt="Yüzen Kapsül Modu" />
 </p>
 
 ---

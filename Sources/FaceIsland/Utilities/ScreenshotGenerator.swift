@@ -100,7 +100,7 @@ public struct ScreenshotGenerator {
                 IslandContentProvider.shared.expansionState = .expanded(.faceID)
                 return AnyView(IslandView(isTopAttached: true, initialTab: "Settings", initialSettingsSubTab: "Permissions").id("settings_permissions"))
             }),
-            ("08_compact_notch.png", 500, 110, false, {
+            ("08_compact_notch.png", 650, 130, false, {
                 NowPlayingManager.shared.isPlaying = false
                 CalendarManager.shared.nextEvent = CalendarEventItem(
                     id: "1",
@@ -113,7 +113,7 @@ public struct ScreenshotGenerator {
                 )
                 CalendarManager.shared.countdownString = "2 sa 39 dk sonra"
                 IslandContentProvider.shared.expansionState = .compact
-                return AnyView(IslandView(isTopAttached: true, initialTab: "Nook").id("compact_notch"))
+                return AnyView(IslandView(isTopAttached: true, initialTab: "Music").id("compact_notch"))
             }),
             ("09_notch_video_player.png", 650, 430, false, {
                 NowPlayingManager.shared.title = "Apple Keynote: macOS Sequoia & Apple Intelligence"
@@ -127,7 +127,7 @@ public struct ScreenshotGenerator {
                 IslandContentProvider.shared.expansionState = .expanded(.music)
                 return AnyView(IslandView(isTopAttached: true, initialTab: "Music").id("notch_video_player"))
             }),
-            ("10_floating_capsule.png", 520, 140, true, {
+            ("10_floating_capsule.png", 650, 160, true, {
                 SettingsManager.shared.enableNotchVideoPlayer = false
                 NowPlayingManager.shared.isPlaying = true
                 NowPlayingManager.shared.title = "Blinding Lights"
